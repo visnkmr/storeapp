@@ -78,7 +78,17 @@ fun TvHome(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("AppStore (TV)") }) }
+        topBar = { 
+            TopAppBar(
+                title = { Text("AppStore (TV)") },
+                actions = {
+                    // Add Downloads button for TV UI
+                    androidx.compose.material3.IconButton(onClick = onOpenDownloads) {
+                        Text("📁")
+                    }
+                }
+            )
+        }
     ) { pad ->
         Column(
             modifier = Modifier
