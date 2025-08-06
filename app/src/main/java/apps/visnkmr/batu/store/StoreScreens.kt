@@ -201,8 +201,30 @@ fun DownloadsScreen(
     onOpenApkInfo: (slug: String, apkPath: String) -> Unit
 ) {
     val filesState = remember { mutableStateOf(listDownloadedApks(context)) }
+
+    fun clearAll() {
+        val base = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "apks")
+        if (base.exists()) {
+            // Recursively delete all files/dirs under apks
+            base.walkBottomUp().forEach { f ->
+                runCatching { if (f.isFile) f.delete() else f.delete() }
+            }
+        }
+        filesState.value = listDownloadedApks(context)
+    }
+
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Downloads") }) }
+        topBar = { 
+            TopAppBar(
+                title = { Text("Downloads") },
+                actions = {
+                    // Clear all button in the top-right
+                    IconButton(onClick = { clearAll() }) {
+                        Text("Clear all")
+                    }
+                }
+            ) 
+        }
     ) { pad ->
         Column(
             modifier = Modifier
