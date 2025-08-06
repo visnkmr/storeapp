@@ -7,6 +7,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import android.annotation.SuppressLint
 import androidx.activity.compose.setContent
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import android.app.UiModeManager
+import android.content.pm.PackageManager
+import android.content.Context.UI_MODE_SERVICE
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -96,6 +104,15 @@ import java.io.IOException
 @SuppressLint("CustomSplashScreen")
 class MainActivity : ComponentActivity() {
 
+    private fun isTvDevice(): Boolean {
+        val uiMode = (getSystemService(UI_MODE_SERVICE) as? UiModeManager)?.currentModeType
+        val isUiTv = uiMode == Configuration.UI_MODE_TYPE_TELEVISION
+        val pm = packageManager
+        val hasLeanback = pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        val hasTelevision = pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
+        return isUiTv || hasLeanback || hasTelevision
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -116,10 +133,49 @@ class MainActivity : ComponentActivity() {
 
             TVCalendarTheme(darkTheme = dark) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    // Replace chat UI with AppStore UI
-                    apps.visnkmr.batu.store.StoreHome(
-                        onOpenDetails = { /* TODO: navigate to details screen if needed */ }
-                    )
+                    val isTv = remember { isTvDevice() }
+                    val nav = rememberNavController()
+                    if (!isTv) {
+                        // Phone/Tablet graph
+                        NavHost(
+                            navController = nav,
+                            startDestination = "home"
+                        ) {
+                            composable("home") {
+                                apps.visnkmr.batu.store.StoreHome(
+                                    onOpenDetails = { app -> nav.navigate("details/${app.slug}") }
+                                )
+                            }
+                            composable("details/{slug}") { backStackEntry ->
+                                val slug = backStackEntry.arguments?.getString("slug") ?: ""
+                                apps.visnkmr.batu.store.PhoneDetailsScreen(
+                                    slug = slug,
+                                    onBack = { nav.popBackStack() },
+                                    context = this@MainActivity
+                                )
+                            }
+                        }
+                    } else {
+                        // TV graph (shelves + details)
+                        NavHost(
+                            navController = nav,
+                            startDestination = "tv_home"
+                        ) {
+                            composable("tv_home") {
+                                apps.visnkmr.batu.tv.TvStoreScreenWrapper(
+                                    onOpenDetails = { app -> nav.navigate("tv_details/${app.slug}") }
+                                )
+                            }
+                            composable("tv_details/{slug}") { backStackEntry ->
+                                val slug = backStackEntry.arguments?.getString("slug") ?: ""
+                                apps.visnkmr.batu.tv.FireTvDetailsScreen(
+                                    slug = slug,
+                                    onBack = { nav.popBackStack() },
+                                    context = this@MainActivity
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

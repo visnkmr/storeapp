@@ -33,6 +33,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -131,15 +133,16 @@ fun StoreHome(
     val statusMap = remember { mutableStateMapOf<String, String>() } // idle/downloading/downloaded/installing/installed
 
     LaunchedEffect(Unit) {
-        runCatching { fetchAppList() }
+        runCatching {
+            StoreRepository.loadIfNeeded()
+            StoreRepository.listFiltered()
+        }
             .onSuccess { appsState.value = it }
             .onFailure { errorState.value = it.message }
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("AppStore") })
-        }
+        topBar = { TopAppBar(title = { Text("AppStore") }) }
     ) { pad ->
         Column(
             modifier = Modifier
@@ -159,15 +162,16 @@ fun StoreHome(
             errorState.value?.let { err ->
                 Text("Error: $err", color = Color(0xFFB00020))
             }
-            val filtered = if (queryState.value.isBlank()) appsState.value else appsState.value.filter {
-                it.title.contains(queryState.value, true) || (it.tags.joinToString(",").contains(queryState.value, true))
+            val filtered = if (queryState.value.isBlank()) appsState.value
+            else appsState.value.filter {
+                it.title.contains(queryState.value, ignoreCase = true) ||
+                        it.tags.any { t -> t.contains(queryState.value, ignoreCase = true) }
             }
-            androidx.compose.foundation.lazy.LazyColumn(
+            LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(filtered.size) { idx ->
-                    val app = filtered[idx]
+                items(filtered) { app ->
                     AppRow(
                         app = app,
                         progress = progressMap[app.slug] ?: 0f,
@@ -182,7 +186,7 @@ fun StoreHome(
 }
 
 @Composable
-private fun AppRow(
+fun AppRow(
     app: StoreApp,
     progress: Float,
     status: String,
@@ -285,7 +289,7 @@ private fun ensureInstallPermission(context: Context): Boolean {
     }
 }
 
-private fun startDownload(
+public fun startDownload(
     context: Context,
     app: StoreApp,
     progressMap: MutableMap<String, Float>,
