@@ -148,7 +148,8 @@ data class ApkInfo(
     val permissions: List<String>,
     val activities: List<String>,
     val services: List<String>,
-    val receivers: List<String>
+    val receivers: List<String>,
+    val icon: android.graphics.drawable.Drawable? = null // optionally include resolved icon/banner
 )
 
 fun parseApkInfo(context: Context, apk: File): ApkInfo {
@@ -158,14 +159,27 @@ fun parseApkInfo(context: Context, apk: File): ApkInfo {
         apk.absolutePath,
         PackageManager.GET_PERMISSIONS or PackageManager.GET_ACTIVITIES or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS
     )
+    // Prepare to resolve app resources (icon/banner) directly from the APK, without FileProvider URI
     pkgInfo?.applicationInfo?.apply {
-        // required so that icons/resources can be resolved if needed later
         sourceDir = apk.absolutePath
         publicSourceDir = apk.absolutePath
     }
     val vCode = try {
         if (android.os.Build.VERSION.SDK_INT >= 28) pkgInfo?.longVersionCode else pkgInfo?.versionCode?.toLong()
     } catch (_: Exception) { null }
+
+    // Try to load a rich banner first on TV, then fallback to icon
+    val iconDrawable: android.graphics.drawable.Drawable? = try {
+        val appInfo = pkgInfo?.applicationInfo
+        val banner = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT_WATCH) {
+            // loadBanner may return null if banner not provided
+            appInfo?.loadBanner(pm)
+        } else null
+        banner ?: appInfo?.loadIcon(pm)
+    } catch (_: Exception) {
+        null
+    }
+
     return ApkInfo(
         packageName = pkgInfo?.packageName,
         versionName = pkgInfo?.versionName,
@@ -174,6 +188,7 @@ fun parseApkInfo(context: Context, apk: File): ApkInfo {
         activities = pkgInfo?.activities?.map { it.name } ?: emptyList(),
         services = pkgInfo?.services?.map { it.name } ?: emptyList(),
         receivers = pkgInfo?.receivers?.map { it.name } ?: emptyList(),
+        icon = iconDrawable
     )
 }
  
@@ -215,15 +230,34 @@ fun DownloadsScreen(
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Show icon if possible via content uri
-                                AsyncImage(
-                                    model = apkContentUri(context, f),
-                                    contentDescription = info.packageName ?: f.name,
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(10.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
+                                // Prefer icon/banner loaded from PackageManager if available, else fallback to URI
+                                if (info.icon != null) {
+                                    // Draw Drawable via AndroidView to avoid extra image libs or extensions
+                                    androidx.compose.ui.viewinterop.AndroidView(
+                                        factory = { ctx ->
+                                            android.widget.ImageView(ctx).apply {
+                                                layoutParams = android.view.ViewGroup.LayoutParams(
+                                                    (48 * ctx.resources.displayMetrics.density).toInt(),
+                                                    (48 * ctx.resources.displayMetrics.density).toInt()
+                                                )
+                                                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                                                setImageDrawable(info.icon)
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                    )
+                                } else {
+                                    AsyncImage(
+                                        model = apkContentUri(context, f),
+                                        contentDescription = info.packageName ?: f.name,
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(RoundedCornerShape(10.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
                                 Spacer(Modifier.width(10.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(info.packageName ?: f.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -237,7 +271,7 @@ fun DownloadsScreen(
                                     if (sub.isNotBlank()) {
                                         Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    Text(f.absolutePath, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    // Text(f.absolutePath, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                                 Spacer(Modifier.width(10.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

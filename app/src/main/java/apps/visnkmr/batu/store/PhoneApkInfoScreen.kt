@@ -73,14 +73,34 @@ fun PhoneApkInfoScreen(
         ) {
             // Header with icon and main metadata
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                val iconModel = try { apkContentUri(context, file) } catch (_: Exception) { null }
-                AsyncImage(
-                    model = iconModel,
-                    contentDescription = "APK Icon",
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                )
+                // Prefer icon/banner loaded from PackageManager if available (no FileProvider needed)
+                val drawableIcon = info.icon
+                if (drawableIcon != null) {
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        factory = { ctx ->
+                            android.widget.ImageView(ctx).apply {
+                                layoutParams = android.view.ViewGroup.LayoutParams(
+                                    (72 * ctx.resources.displayMetrics.density).toInt(),
+                                    (72 * ctx.resources.displayMetrics.density).toInt()
+                                )
+                                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                                setImageDrawable(drawableIcon)
+                            }
+                        },
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                    )
+                } else {
+                    val iconModel = try { apkContentUri(context, file) } catch (_: Exception) { null }
+                    AsyncImage(
+                        model = iconModel,
+                        contentDescription = "APK Icon",
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                    )
+                }
                 Spacer(Modifier.size(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(info.packageName ?: "Unknown package", style = MaterialTheme.typography.titleMedium)
