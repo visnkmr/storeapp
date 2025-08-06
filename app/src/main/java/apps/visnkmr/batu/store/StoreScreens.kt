@@ -72,12 +72,16 @@ data class StoreApp(
     val tags: List<String>,
     val screenshots: List<String>,
     val youtube: List<String>,
-    val excerpt: String?
+    val excerpt: String?,
+    val applicationId: String? = null,
+    val versionCode: Int? = null,
+    val repoName: String? = null,
+    val repoUrl: String? = null
 ) {
     fun iconUrl(): String? {
         // Example images path rule: images/<key>.webp on the repo
         return if (!imageKey.isNullOrBlank()) {
-            "https://raw.githubusercontent.com/visnkmr/appstore/refs/heads/main/images/${imageKey}.webp"
+            "https://cdn.jsdelivr.net/gh/visnkmr/appstore@main/images/${imageKey}.webp"
         } else null
     }
 }
@@ -426,12 +430,24 @@ fun AppDetails(
                     if (line.isNotBlank()) {
                         Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    // Repo info / issues
+                    val repoText = when {
+                        !app.repoUrl.isNullOrBlank() && !app.repoName.isNullOrBlank() -> "Report issues to ${app.repoName}"
+                        !app.repoName.isNullOrBlank() -> "Report issues to ${app.repoName}"
+                        else -> null
+                    }
+                    repoText?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 Box(modifier = Modifier.width(140.dp), contentAlignment = Alignment.Center) {
                     val progress = progressMap[app.slug] ?: 0f
                     val status = statusMap[app.slug] ?: "idle"
                     when (status) {
-                        "idle" -> ElevatedButton(onClick = { startDownload(context, app, progressMap, statusMap) }) { Text("Install") }
+                        "idle" -> {
+                            val label = rememberInstallLabel(context, app)
+                            ElevatedButton(onClick = { startDownload(context, app, progressMap, statusMap) }) { Text(label) }
+                        }
                         "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(progress = progress.coerceIn(0f, 1f), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp)); Text("${(progress*100).toInt()}%")
@@ -455,7 +471,7 @@ fun AppDetails(
                 ) {
                     app.screenshots.forEach { path ->
                         val url = if (path.startsWith("http")) path
-                        else "https://raw.githubusercontent.com/visnkmr/appstore/refs/heads/main/${path.trimStart('/')}"
+                        else "https://cdn.jsdelivr.net/gh/visnkmr/appstore@main/${path.trimStart('/')}"
                         AsyncImage(
                             model = url,
                             contentDescription = null,
@@ -472,5 +488,31 @@ fun AppDetails(
             }
             Text(app.description, style = MaterialTheme.typography.bodyMedium)
         }
+    }
+}
+
+// Determine whether to show Install or Update based on installed versionCode vs JSON versionCode
+@Composable
+private fun rememberInstallLabel(context: android.content.Context, app: StoreApp): String {
+    val pm = context.packageManager
+    val pkg = app.applicationId
+    val remoteCode = app.versionCode
+    if (pkg.isNullOrBlank() || remoteCode == null) return "Install"
+    return try {
+        val pkgInfo = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            pm.getPackageInfo(pkg, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo(pkg, 0)
+        }
+        val installedCode = if (android.os.Build.VERSION.SDK_INT >= 28) {
+            pkgInfo.longVersionCode.toInt()
+        } else {
+            @Suppress("DEPRECATION")
+            pkgInfo.versionCode
+        }
+        if (installedCode < remoteCode) "Update" else "Open"
+    } catch (_: Exception) {
+        "Install"
     }
 }

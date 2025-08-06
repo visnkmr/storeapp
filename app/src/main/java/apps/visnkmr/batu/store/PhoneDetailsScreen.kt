@@ -37,6 +37,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
+@Composable
+private fun installLabel(context: Context, app: StoreApp): String {
+    val pkg = app.applicationId
+    val remote = app.versionCode
+    if (pkg.isNullOrBlank() || remote == null) return "Install"
+    return try {
+        val pm = context.packageManager
+        val info = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            pm.getPackageInfo(pkg, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo(pkg, 0)
+        }
+        val installed = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else @Suppress("DEPRECATION") info.versionCode
+        if (installed < remote) "Update" else "Open"
+    } catch (_: Exception) {
+        "Install"
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhoneDetailsScreen(
@@ -98,13 +118,20 @@ fun PhoneDetailsScreen(
                     if (meta.isNotBlank()) {
                         Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    val repoText = when {
+                        !app.repoName.isNullOrBlank() -> "Report issues to ${app.repoName}"
+                        else -> null
+                    }
+                    repoText?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 // Install CTA
                 val p = progress[app.slug] ?: 0f
                 val s = status[app.slug] ?: "idle"
                 Box(Modifier.size(120.dp, 48.dp), contentAlignment = Alignment.Center) {
                     when (s) {
-                        "idle" -> ElevatedButton(onClick = { startDownload(context, app, progress, status) }) { Text("Install") }
+                        "idle" -> ElevatedButton(onClick = { startDownload(context, app, progress, status) }) { Text(installLabel(context, app)) }
                         "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(progress = p.coerceIn(0f, 1f), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.size(8.dp)); Text("${(p * 100).toInt()}%")
@@ -126,7 +153,7 @@ fun PhoneDetailsScreen(
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
                     app.screenshots.forEach { path ->
                         val url = if (path.startsWith("http")) path
-                        else "https://raw.githubusercontent.com/visnkmr/appstore/refs/heads/main/${path.trimStart('/')}"
+                        else "https://cdn.jsdelivr.net/gh/visnkmr/appstore@main/${path.trimStart('/')}"
                         AsyncImage(
                             model = url,
                             contentDescription = null,

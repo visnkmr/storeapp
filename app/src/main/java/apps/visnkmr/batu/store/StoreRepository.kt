@@ -64,7 +64,11 @@ object StoreRepository {
                     tags = o.optJSONArray("tags")?.let { jArr -> List(jArr.length()) { idx -> jArr.optString(idx) } } ?: emptyList(),
                     screenshots = o.optJSONArray("screenshot")?.let { jArr -> List(jArr.length()) { idx -> jArr.optString(idx) } } ?: emptyList(),
                     youtube = o.optJSONArray("youtube")?.let { jArr -> List(jArr.length()) { idx -> jArr.optString(idx) } } ?: emptyList(),
-                    excerpt = o.optString("excerpt", null)
+                    excerpt = o.optString("excerpt", null),
+                    applicationId = o.optString("applicationID", null),
+                    versionCode = if (o.has("versionCode")) o.optInt("versionCode") else null,
+                    repoName = o.optString("reponame", null),
+                    repoUrl = o.optString("repourl", null)
                 )
             )
         }

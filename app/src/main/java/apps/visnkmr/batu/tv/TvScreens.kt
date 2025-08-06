@@ -221,7 +221,7 @@ fun FireTvDetailsScreen(
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
                     repoApp.screenshots.forEach { path ->
                         val url = if (path.startsWith("http")) path
-                        else "https://raw.githubusercontent.com/visnkmr/appstore/refs/heads/main/${path.trimStart('/')}"
+                        else "https://cdn.jsdelivr.net/gh/visnkmr/appstore@main/${path.trimStart('/')}"
                         AsyncImage(
                             model = url,
                             contentDescription = null,
