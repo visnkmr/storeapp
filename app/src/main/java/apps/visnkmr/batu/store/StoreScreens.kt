@@ -339,17 +339,29 @@ private fun startDownload(
             statusMap[app.slug] = "installing"
             withContext(Dispatchers.Main) {
                 try {
+                    // Use content:// URI via FileProvider to avoid FileUriExposedException
+                    val apkUri = androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        context.packageName + ".fileprovider",
+                        outFile
+                    )
                     val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(Uri.fromFile(outFile), "application/vnd.android.package-archive")
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        setDataAndType(apkUri, "application/vnd.android.package-archive")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     context.startActivity(intent)
                 } catch (_: ActivityNotFoundException) {
-                    // Fallback: open file UI
+                    // Fallback: open generic file UI with content URI
+                    val apkUri = androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        context.packageName + ".fileprovider",
+                        outFile
+                    )
                     val view = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(Uri.fromFile(outFile), "*/*")
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        setDataAndType(apkUri, "*/*")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     context.startActivity(view)
                 }
