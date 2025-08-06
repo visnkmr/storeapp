@@ -1,0 +1,53 @@
+# Gradle and build outputs
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Unit/Instrumentation tests (if not versioning)
+app/src/androidTest/
+app/src/test/
+
+# IDE files
+*.iml
+/.idea/
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+
+# Local environment
+/local.properties
+.DS_Store
+
+# Captures and external native build
+/captures
+.externalNativeBuild
+.cxx/
+
+# Generated intermediates
+**/intermediates/
+**/generated/
+**/outputs/
+
+# Cache and logs
+*.log
+.gradle/
+.cache/
+.kotlinc/
+
+# Signing keys (never commit real keys)
+*.jks
+*.keystore
+
+# Fastlane artifacts
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+
+# NDK
+obj/
+
+# Android Studio navigation temp
+.navigation/
+
+# Misc
+Thumbs.db
