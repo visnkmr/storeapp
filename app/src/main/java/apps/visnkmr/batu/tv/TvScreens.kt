@@ -49,16 +49,20 @@ import apps.visnkmr.batu.store.startDownload
 
 @Composable
 fun TvStoreScreenWrapper(
-    onOpenDetails: (StoreApp) -> Unit
+    onOpenDetails: (StoreApp) -> Unit,
+    onOpenApkInfo: (slug: String, apkPath: String) -> Unit = { _, _ -> },
+    onOpenDownloads: () -> Unit
 ) {
     // Simple wrapper that reuses StoreHome-like grid but arranged for TV shelves
-    TvHome(onOpenDetails = onOpenDetails)
+    TvHome(onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo, onOpenDownloads = onOpenDownloads)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TvHome(
-    onOpenDetails: (StoreApp) -> Unit
+    onOpenDetails: (StoreApp) -> Unit,
+    onOpenApkInfo: (slug: String, apkPath: String) -> Unit = { _, _ -> },
+    onOpenDownloads: () -> Unit
 ) {
     // Use the same centralized repository as phone to avoid divergence
     val appsState = remember { mutableStateOf<List<StoreApp>>(emptyList()) }
@@ -152,7 +156,8 @@ private fun TvCard(
 fun FireTvDetailsScreen(
     slug: String,
     onBack: () -> Unit,
-    context: Context
+    context: Context,
+    onOpenApkInfo: (slug: String, apkPath: String) -> Unit
 ) {
     // Simple reuse of phone layout with slightly larger paddings for TV
     val repoApp = apps.visnkmr.batu.store.StoreRepository.bySlug(slug)
@@ -202,7 +207,11 @@ fun FireTvDetailsScreen(
                 val s = status[repoApp.slug] ?: "idle"
                 Box(Modifier.size(160.dp, 56.dp), contentAlignment = Alignment.Center) {
                     when (s) {
-                        "idle" -> ElevatedButton(onClick = { startDownload(context, repoApp, progress, status) }) { Text("Install") }
+                        "idle" -> ElevatedButton(onClick = {
+                            startDownload(context, repoApp, progress, status) { file ->
+                                onOpenApkInfo(repoApp.slug, file.absolutePath)
+                            }
+                        }) { Text("Install") }
                         "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(progress = p.coerceIn(0f, 1f), modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.size(8.dp)); Text("${(p * 100).toInt()}%")

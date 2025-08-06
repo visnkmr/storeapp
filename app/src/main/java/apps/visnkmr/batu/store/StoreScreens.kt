@@ -8,6 +8,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Environment
 import android.provider.Settings
+import android.content.pm.PackageManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +32,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.lazy.LazyColumn
@@ -121,11 +124,160 @@ private suspend fun fetchAppList(): List<StoreApp> = withContext(Dispatchers.IO)
         parseApps(body)
     }
 }
+ 
+// Helper to resolve consistent apk file output path per app/version
+fun resolveApkFile(context: Context, app: StoreApp): File {
+    val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "apks/${app.slug}/${app.version ?: "latest"}")
+    return File(dir, "app.apk")
+}
+
+// Build a content uri for the apk file (for installer or displaying icon)
+fun apkContentUri(context: Context, file: File): Uri {
+    return androidx.core.content.FileProvider.getUriForFile(
+        context,
+        context.packageName + ".fileprovider",
+        file
+    )
+}
+
+// Minimal APK info model using PackageManager.getPackageArchiveInfo
+data class ApkInfo(
+    val packageName: String?,
+    val versionName: String?,
+    val versionCode: Long?,
+    val permissions: List<String>,
+    val activities: List<String>,
+    val services: List<String>,
+    val receivers: List<String>
+)
+
+fun parseApkInfo(context: Context, apk: File): ApkInfo {
+    val pm = context.packageManager
+    @Suppress("DEPRECATION")
+    val pkgInfo = pm.getPackageArchiveInfo(
+        apk.absolutePath,
+        PackageManager.GET_PERMISSIONS or PackageManager.GET_ACTIVITIES or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS
+    )
+    pkgInfo?.applicationInfo?.apply {
+        // required so that icons/resources can be resolved if needed later
+        sourceDir = apk.absolutePath
+        publicSourceDir = apk.absolutePath
+    }
+    val vCode = try {
+        if (android.os.Build.VERSION.SDK_INT >= 28) pkgInfo?.longVersionCode else pkgInfo?.versionCode?.toLong()
+    } catch (_: Exception) { null }
+    return ApkInfo(
+        packageName = pkgInfo?.packageName,
+        versionName = pkgInfo?.versionName,
+        versionCode = vCode,
+        permissions = pkgInfo?.requestedPermissions?.toList() ?: emptyList(),
+        activities = pkgInfo?.activities?.map { it.name } ?: emptyList(),
+        services = pkgInfo?.services?.map { it.name } ?: emptyList(),
+        receivers = pkgInfo?.receivers?.map { it.name } ?: emptyList(),
+    )
+}
+ 
+// Screen listing all downloaded APK files in the app's directory with install/delete
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DownloadsScreen(
+    context: Context,
+    onBack: () -> Unit,
+    onOpenApkInfo: (slug: String, apkPath: String) -> Unit
+) {
+    val filesState = remember { mutableStateOf(listDownloadedApks(context)) }
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Downloads") }) }
+    ) { pad ->
+        Column(
+            modifier = Modifier
+                .padding(pad)
+                .fillMaxSize()
+                .padding(12.dp)
+        ) {
+            val files = filesState.value
+            if (files.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No APKs downloaded")
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(files) { f ->
+                        val info = parseApkInfo(context, f)
+                        val slugGuess = info.packageName ?: f.nameWithoutExtension
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Show icon if possible via content uri
+                                AsyncImage(
+                                    model = apkContentUri(context, f),
+                                    contentDescription = info.packageName ?: f.name,
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(RoundedCornerShape(10.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(info.packageName ?: f.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    val sub = buildString {
+                                        info.versionName?.let { append("v").append(it) }
+                                        info.versionCode?.let { 
+                                            if (isNotEmpty()) append(" • ")
+                                            append("code ").append(it)
+                                        }
+                                    }
+                                    if (sub.isNotBlank()) {
+                                        Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Text(f.absolutePath, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ElevatedButton(onClick = { 
+                                        // Open our in-app APK info screen with the best slug guess and real path
+                                        val slug = info.packageName ?: f.nameWithoutExtension
+                                        onOpenApkInfo(slug, f.absolutePath)
+                                    }) { Text("Install") }
+                                    ElevatedButton(onClick = { 
+                                        runCatching { f.delete() }
+                                        // refresh
+                                        filesState.value = listDownloadedApks(context)
+                                    }) { Text("🗑") }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Helper: list all .apk files under app-managed downloads directory
+fun listDownloadedApks(context: Context): List<File> {
+    val base = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "apks")
+    if (!base.exists()) return emptyList()
+    val out = ArrayList<File>()
+    base.walkTopDown().forEach { f ->
+        if (f.isFile && f.extension.equals("apk", ignoreCase = true)) out.add(f)
+    }
+    return out.sortedByDescending { it.lastModified() }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StoreHome(
-    onOpenDetails: (StoreApp) -> Unit
+    onOpenDetails: (StoreApp) -> Unit,
+    onOpenApkInfo: (slug: String, apkPath: String) -> Unit,
+    onOpenDownloads: () -> Unit
 ) {
     val context = LocalContext.current
     val appsState = remember { mutableStateOf<List<StoreApp>>(emptyList()) }
@@ -146,7 +298,18 @@ fun StoreHome(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("AppStore") }) }
+        topBar = { 
+            TopAppBar(
+                title = { Text("AppStore") },
+                actions = {
+                    // Navigate to downloaded files screen
+                    IconButton(onClick = onOpenDownloads) {
+                        // Use a simple glyph to represent Downloads to avoid icon classpath issues
+                        Text("📁")
+                    }
+                }
+            ) 
+        }
     ) { pad ->
         Column(
             modifier = Modifier
@@ -154,9 +317,14 @@ fun StoreHome(
                 .fillMaxSize()
                 .padding(horizontal = 12.dp)
         ) {
+            // Update banner for visnkmr.apps.appstore
+            val updateTarget = remember { findByApplicationId("visnkmr.apps.appstore") }
+            UpdateBanner(target = updateTarget, height = 48.dp) {
+                updateTarget?.let { onOpenDetails(it) }
+            }
             androidx.compose.material3.OutlinedTextField(
                 value = queryState.value,
-                onValueChange = { queryState.value = it },
+                onValueChange = { v -> queryState.value = v },
                 placeholder = { Text("Search apps") },
                 singleLine = true,
                 modifier = Modifier
@@ -181,7 +349,12 @@ fun StoreHome(
                         progress = progressMap[app.slug] ?: 0f,
                         status = statusMap[app.slug] ?: "idle",
                         onClick = { onOpenDetails(app) },
-                        onInstall = { startDownload(context, app, progressMap, statusMap) }
+                        onInstall = { 
+                            // Phone list: after download completes, do NOT auto-open APK info screen.
+                            // Status will become "downloaded" and the button will change to "Install".
+                            startDownload(context, app, progressMap, statusMap) { /* no-op on list */ }
+                        },
+                        onOpenApkInfo = { slug, apkPath -> onOpenApkInfo(slug, apkPath) }
                     )
                 }
             }
@@ -195,8 +368,12 @@ fun AppRow(
     progress: Float,
     status: String,
     onClick: () -> Unit,
-    onInstall: () -> Unit
+    onInstall: () -> Unit,
+    onOpenApkInfo: (slug: String, apkPath: String) -> Unit = { _, _ -> }
+
+    
 ) {
+    val context = LocalContext.current
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
@@ -247,7 +424,7 @@ fun AppRow(
             ) {
                 when (status) {
                     "idle" -> {
-                        ElevatedButton(onClick = onInstall) { Text("Install") }
+                        ElevatedButton(onClick = onInstall) { Text("Download") }
                     }
                     "downloading" -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -257,7 +434,10 @@ fun AppRow(
                         }
                     }
                     "downloaded" -> {
-                        Text("Verifying…")
+                        ElevatedButton(onClick = {
+                            val file = resolveApkFile(context, app)
+                            onOpenApkInfo(app.slug, file.absolutePath)
+                        }) { Text("Install") }
                     }
                     "installing" -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -297,16 +477,17 @@ public fun startDownload(
     context: Context,
     app: StoreApp,
     progressMap: MutableMap<String, Float>,
-    statusMap: MutableMap<String, String>
+    statusMap: MutableMap<String, String>,
+    onDownloaded: ((File) -> Unit)? = null
 ) {
     if (!ensureInstallPermission(context)) {
         // User will come back after enabling; keep UI idle for now
         return
     }
     val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-    val fileDir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "apks/${app.slug}/${app.version ?: "latest"}")
+    val outFile = resolveApkFile(context, app)
+    val fileDir = outFile.parentFile!!
     if (!fileDir.exists()) fileDir.mkdirs()
-    val outFile = File(fileDir, "app.apk")
 
     val request = DownloadManager.Request(Uri.parse(app.downloadUrl))
         .setAllowedOverMetered(true)
@@ -343,40 +524,8 @@ public fun startDownload(
             }
         }
         if (statusMap[app.slug] == "downloaded") {
-            // Trigger system package installer
-            statusMap[app.slug] = "installing"
-            withContext(Dispatchers.Main) {
-                try {
-                    // Use content:// URI via FileProvider to avoid FileUriExposedException
-                    val apkUri = androidx.core.content.FileProvider.getUriForFile(
-                        context,
-                        context.packageName + ".fileprovider",
-                        outFile
-                    )
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(apkUri, "application/vnd.android.package-archive")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    context.startActivity(intent)
-                } catch (_: ActivityNotFoundException) {
-                    // Fallback: open generic file UI with content URI
-                    val apkUri = androidx.core.content.FileProvider.getUriForFile(
-                        context,
-                        context.packageName + ".fileprovider",
-                        outFile
-                    )
-                    val view = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(apkUri, "*/*")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    context.startActivity(view)
-                }
-            }
-            // We cannot know final install success without a package observer; mark installed after a grace period
-            delay(2000)
-            statusMap[app.slug] = "installed"
+            // Notify UI to open APK Info screen; do not auto-launch the installer here.
+            withContext(Dispatchers.Main) { onDownloaded?.invoke(outFile) }
         }
     }
 }
@@ -388,7 +537,8 @@ public fun startDownload(
 @Composable
 fun AppDetails(
     app: StoreApp,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenApkInfo: (slug: String, apkPath: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val progressMap = remember { mutableStateMapOf<String, Float>() }
@@ -445,14 +595,21 @@ fun AppDetails(
                     val status = statusMap[app.slug] ?: "idle"
                     when (status) {
                         "idle" -> {
-                            val label = rememberInstallLabel(context, app)
-                            ElevatedButton(onClick = { startDownload(context, app, progressMap, statusMap) }) { Text(label) }
+                            val label = rememberInstallLabel(context, app).replace("Install", "Download")
+                            ElevatedButton(onClick = {
+                                startDownload(context, app, progressMap, statusMap) { /* after download, UI will show 'downloaded' state */ }
+                            }) { Text(label) }
                         }
                         "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(progress = progress.coerceIn(0f, 1f), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp)); Text("${(progress*100).toInt()}%")
                         }
-                        "downloaded" -> Text("Verifying…")
+                        "downloaded" -> {
+                            ElevatedButton(onClick = {
+                                val file = resolveApkFile(context, app)
+                                onOpenApkInfo(app.slug, file.absolutePath)
+                            }) { Text("Install") }
+                        }
                         "installing" -> Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp)); Text("Installing…")
