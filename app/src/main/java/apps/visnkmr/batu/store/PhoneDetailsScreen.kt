@@ -163,10 +163,10 @@ fun PhoneDetailsScreen(
                             model = url,
                             contentDescription = null,
                             modifier = Modifier
-                                .size(width = 280.dp, height = 160.dp)
+                                .height(200.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .padding(end = 8.dp),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Fit
                         )
                     }
                 }

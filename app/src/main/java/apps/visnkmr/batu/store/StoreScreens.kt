@@ -84,7 +84,7 @@ data class StoreApp(
     fun iconUrl(): String? {
         // Example images path rule: images/<key>.webp on the repo
         return if (!imageKey.isNullOrBlank()) {
-            "https://cdn.jsdelivr.net/gh/visnkmr/appstore@main/images/${imageKey}.webp"
+            "https://cdn.jsdelivr.net/gh/visnkmr/appstore@main/images/${imageKey}.png"
         } else null
     }
 }

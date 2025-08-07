@@ -245,10 +245,10 @@ fun FireTvDetailsScreen(
                             model = url,
                             contentDescription = null,
                             modifier = Modifier
-                                .size(width = 360.dp, height = 200.dp)
+                                .height(240.dp)
                                 .clip(RoundedCornerShape(16.dp))
                                 .padding(end = 10.dp),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Fit
                         )
                     }
                 }
