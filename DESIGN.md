@@ -244,3 +244,23 @@ MainActivity decides the graph based on device form factor (UiMode/feature detec
 - TV: verify DPAD scroll on TvApkInfoScreen and list navigation in DownloadsScreen.
 - DownloadManager: test metered vs Wi-Fi, failures, resuming.
 - Permissions: toggling “Install unknown apps” for the app and user journey to Settings.
+
+
+##JSON List expected fields
+
+slug - String: Unique identifier for the app
+title - String: App display name
+description - String: Full app description
+downloadurl - String: Direct download URL for the APK file
+download - String: Download count display text (e.g., "1.2K downloads")
+lastupdated - String: Last update date/time text
+image - String: Image key for the app icon (used to construct icon URL)
+version - String: Version name/number
+excerpt - String: Short description/summary for list view
+tags - Array of Strings: Categories/tags for filtering and search
+screenshot - Array of Strings: Screenshot image paths/URLs
+youtube - Array of Strings: YouTube video URLs/IDs
+applicationId - String: Android package name (defaults to null)
+versionCode - Int: Android version code (defaults to null)
+repoName - String: Repository name for issue reporting (defaults to null)
+repoUrl - String: Repository URL (defaults to null)
