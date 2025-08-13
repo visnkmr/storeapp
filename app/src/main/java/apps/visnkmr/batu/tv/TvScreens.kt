@@ -54,7 +54,8 @@ fun TvStoreScreenWrapper(
     onOpenDownloads: () -> Unit
 ) {
     // Simple wrapper that reuses StoreHome-like grid but arranged for TV shelves
-    TvHome(onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo, onOpenDownloads = onOpenDownloads)
+    // TvHome(onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo, onOpenDownloads = onOpenDownloads)
+    TvStoreScreen(onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo, onOpenDownloads = onOpenDownloads)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,17 +79,17 @@ fun TvHome(
     }
 
     Scaffold(
-        topBar = { 
-            TopAppBar(
-                title = { Text("AppStore (TV)") },
-                actions = {
-                    // Add Downloads button for TV UI
-                    androidx.compose.material3.IconButton(onClick = onOpenDownloads) {
-                        Text("📁")
-                    }
-                }
-            )
-        }
+        // topBar = { 
+        //     TopAppBar(
+        //         title = { Text("AppStore (TV)") },
+        //         actions = {
+        //             // Add Downloads button for TV UI
+        //             androidx.compose.material3.IconButton(onClick = onOpenDownloads) {
+        //                 Text("📁")
+        //             }
+        //         }
+        //     )
+        // }
     ) { pad ->
         Column(
             modifier = Modifier
@@ -170,11 +171,30 @@ fun FireTvDetailsScreen(
     onOpenApkInfo: (slug: String, apkPath: String) -> Unit
 ) {
     // Simple reuse of phone layout with slightly larger paddings for TV
-    val repoApp = apps.visnkmr.batu.store.StoreRepository.bySlug(slug)
+    val appsState = remember { mutableStateOf<List<apps.visnkmr.batu.store.StoreApp>>(emptyList()) }
+    val errorState = remember { mutableStateOf<String?>(null) }
+    var repoApp by remember { mutableStateOf<apps.visnkmr.batu.store.StoreApp?>(null) }
+
+    LaunchedEffect(Unit) {
+        runCatching {
+            apps.visnkmr.batu.store.StoreRepository.loadIfNeeded()
+            val app = apps.visnkmr.batu.store.StoreRepository.bySlug(slug)
+            repoApp = app
+        }
+            .onFailure { errorState.value = it.message }
+    }
     Scaffold(
         topBar = { TopAppBar(title = { Text(repoApp?.title ?: "App") }) }
     ) { pad ->
-        if (repoApp == null) {
+        if (errorState.value != null) {
+            Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
+                Text("Error: ${errorState.value}")
+            }
+            return@Scaffold
+        }
+        
+        val app = repoApp
+        if (app == null) {
             Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
                 Text("App not found")
             }
@@ -190,8 +210,8 @@ fun FireTvDetailsScreen(
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
-                    model = repoApp.iconUrl(),
-                    contentDescription = repoApp.title,
+                    model = app.iconUrl(),
+                    contentDescription = app.title,
                     modifier = Modifier
                         .size(120.dp)
                         .clip(RoundedCornerShape(24.dp)),
@@ -199,13 +219,13 @@ fun FireTvDetailsScreen(
                 )
                 Spacer(Modifier.size(20.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(repoApp.title, style = MaterialTheme.typography.headlineSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(app.title, style = MaterialTheme.typography.headlineSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     val meta = buildString {
-                        repoApp.version?.let { append("Version ").append(it) }
-                        repoApp.lastUpdated?.let {
+                        app.version?.let { append("Version ").append(it) }
+                        app.lastUpdated?.let {
                             if (isNotEmpty()) append(" • "); append("Updated ").append(it)
                         }
-                        repoApp.download?.let {
+                        app.download?.let {
                             if (isNotEmpty()) append(" • "); append(it).append(" downloads")
                         }
                     }
@@ -213,13 +233,13 @@ fun FireTvDetailsScreen(
                         Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                val p = progress[repoApp.slug] ?: 0f
-                val s = status[repoApp.slug] ?: "idle"
+                val p = progress[app.slug] ?: 0f
+                val s = status[app.slug] ?: "idle"
                 Box(Modifier.size(160.dp, 56.dp), contentAlignment = Alignment.Center) {
                     when (s) {
                         "idle" -> ElevatedButton(onClick = {
-                            startDownload(context, repoApp, progress, status) { file ->
-                                onOpenApkInfo(repoApp.slug, file.absolutePath)
+                            startDownload(context, app, progress, status) { file ->
+                                onOpenApkInfo(app.slug, file.absolutePath)
                             }
                         }) { Text("Install") }
                         "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
@@ -236,9 +256,9 @@ fun FireTvDetailsScreen(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            if (repoApp.screenshots.isNotEmpty()) {
+            if (app.screenshots.isNotEmpty()) {
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
-                    repoApp.screenshots.forEach { path ->
+                    app.screenshots.forEach { path ->
                         val url = if (path.startsWith("http")) path
                         else "https://cdn.jsdelivr.net/gh/visnkmr/appstore@main/${path.trimStart('/')}"
                         AsyncImage(
@@ -254,7 +274,7 @@ fun FireTvDetailsScreen(
                 }
                 Spacer(Modifier.height(16.dp))
             }
-            Text(repoApp.description, style = MaterialTheme.typography.bodyLarge)
+            Text(app.description, style = MaterialTheme.typography.bodyLarge)
         }
     }
 }

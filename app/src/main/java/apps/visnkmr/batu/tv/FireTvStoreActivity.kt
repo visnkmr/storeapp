@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedButton
@@ -64,6 +66,9 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.draw.scale
 
 /**
  * A large-screen Fire TV–style store activity built with Jetpack Compose and DPAD focus.
@@ -72,19 +77,21 @@ import org.json.JSONArray
  * - Vertically scrolling sections (e.g., "Featured", "Trending", "All Apps")
  * - Each section is a LazyRow of large hero cards that respond to DPAD focus
  */
-class FireTvStoreActivity : ComponentActivity() {
-    @OptIn(ExperimentalMaterial3Api::class)
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            TvStoreScreen()
-        }
-    }
-}
+// class FireTvStoreActivity : ComponentActivity() {
+//     @OptIn(ExperimentalMaterial3Api::class)
+//     override fun onCreate(savedInstanceState: Bundle?) {
+//         super.onCreate(savedInstanceState)
+//         setContent {
+//             TvStoreScreen()
+//         }
+//     }
+// }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
-fun TvStoreScreen() {
+fun TvStoreScreen( onOpenDetails: (StoreApp) -> Unit,
+onOpenApkInfo: (slug: String, apkPath: String) -> Unit = { _, _ -> },
+onOpenDownloads: () -> Unit) {
     val appsState = remember { mutableStateOf<List<StoreApp>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -112,20 +119,20 @@ fun TvStoreScreen() {
             }
 
             // Simple heuristics for sections (can be refined based on tags/lastUpdated)
-            val featured = appsState.value.take(10)
-            val trending = appsState.value.drop(10).take(10)
+            val featured = appsState.value.take(2)
+            val trending = appsState.value.drop(2).take(2)
             val all = appsState.value
 
             if (featured.isNotEmpty()) {
-                SectionRow(title = "Featured", data = featured)
+                SectionRow(title = "Featured", data = featured,onOpenDetails = { onOpenDetails(it) })
                 Spacer(Modifier.height(18.dp))
             }
             if (trending.isNotEmpty()) {
-                SectionRow(title = "Trending", data = trending)
+                SectionRow(title = "Trending", data = trending,onOpenDetails = { onOpenDetails(it) })
                 Spacer(Modifier.height(18.dp))
             }
             if (all.isNotEmpty()) {
-                SectionRow(title = "All Apps", data = all)
+                SectionRow(title = "All Apps", data = all, onOpenDetails = { onOpenDetails(it) })
             } else if (error == null) {
                 Text("Loading…", style = MaterialTheme.typography.bodyMedium)
             }
@@ -134,7 +141,7 @@ fun TvStoreScreen() {
 }
 
 @Composable
-private fun SectionRow(title: String, data: List<StoreApp>) {
+private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (StoreApp) -> Unit,) {
     Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
     Spacer(Modifier.height(8.dp))
 
@@ -146,80 +153,97 @@ private fun SectionRow(title: String, data: List<StoreApp>) {
         modifier = Modifier.fillMaxWidth()
     ) {
         items(data) { app ->
-            TvAppCard(app = app)
+            TvAppCard(app = app,onClick = { onOpenDetails(app) })
         }
     }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun TvAppCard(app: StoreApp) {
+private fun TvAppCard(app: StoreApp,onClick: () -> Unit) {
     // focus handling
     val focusManager = LocalFocusManager.current
     val requester = remember { FocusRequester() }
     var focused by remember { mutableStateOf(false) }
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (focused) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
-        ),
+    val interaction = remember { MutableInteractionSource() }
+    androidx.compose.material3.Surface(
+        tonalElevation = if (focused) 6.dp else 2.dp,
+        shadowElevation = if (focused) 8.dp else 2.dp,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
         modifier = Modifier
-            .size(width = 320.dp, height = 180.dp)
-            .onKeyEvent { event ->
-                // Handle DPAD using Compose KeyEvent API. Compose versions differ; use native action where available.
-                val native = try { event.nativeKeyEvent } catch (_: Throwable) { null }
-                val isDown = native?.action == android.view.KeyEvent.ACTION_DOWN
-                if (!isDown) return@onKeyEvent false
-                val pressedKey = try { event.key } catch (_: Throwable) { null }
-                when (pressedKey) {
-                    Key.DirectionCenter, Key.Enter -> true
-                    Key.DirectionDown -> { focusManager.moveFocus(FocusDirection.Down); true }
-                    Key.DirectionUp -> { focusManager.moveFocus(FocusDirection.Up); true }
-                    Key.DirectionLeft -> { focusManager.moveFocus(FocusDirection.Left); true }
-                    Key.DirectionRight -> { focusManager.moveFocus(FocusDirection.Right); true }
-                    else -> false
-                }
-            }
-            .focusRequester(requester)
+            .size(width = 260.dp, height = 180.dp)
             .onFocusChanged { focused = it.isFocused }
-            .focusable()
-    ) {
-        Row(
-            Modifier
-                .fillMaxSize()
-                .padding(12.dp)
-        ) {
-            AsyncImage(
-                model = app.iconUrl(),
-                contentDescription = app.title,
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(RoundedCornerShape(16.dp)),
-                contentScale = ContentScale.Crop
+            .focusable(true, interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick
             )
-            Spacer(Modifier.size(12.dp))
-            Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text(app.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    val sub = buildString {
-                        app.version?.let { append("v").append(it) }
-                        app.lastUpdated?.let {
-                            if (isNotEmpty()) append(" • ")
-                            append("Updated ").append(it)
+            .scale(if (focused) 1.05f else 1.0f)
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (focused) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+            ),
+            modifier = Modifier
+                .size(width = 320.dp, height = 180.dp)
+                .onKeyEvent { event ->
+                    // Handle DPAD using Compose KeyEvent API. Compose versions differ; use native action where available.
+                    val native = try { event.nativeKeyEvent } catch (_: Throwable) { null }
+                    val isDown = native?.action == android.view.KeyEvent.ACTION_DOWN
+                    if (!isDown) return@onKeyEvent false
+                    val pressedKey = try { event.key } catch (_: Throwable) { null }
+                    when (pressedKey) {
+                        Key.DirectionCenter, Key.Enter -> true
+                        Key.DirectionDown -> { focusManager.moveFocus(FocusDirection.Down); true }
+                        Key.DirectionUp -> { focusManager.moveFocus(FocusDirection.Up); true }
+                        Key.DirectionLeft -> { focusManager.moveFocus(FocusDirection.Left); true }
+                        Key.DirectionRight -> { focusManager.moveFocus(FocusDirection.Right); true }
+                        else -> false
+                    }
+                }
+                .focusRequester(requester)
+                .onFocusChanged { focused = it.isFocused }
+                .focusable()
+        ) {
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .padding(12.dp)
+            ) {
+                AsyncImage(
+                    model = app.iconUrl(),
+                    contentDescription = app.title,
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(Modifier.size(12.dp))
+                Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text(app.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        val sub = buildString {
+                            app.version?.let { append("v").append(it) }
+                            app.lastUpdated?.let {
+                                if (isNotEmpty()) append(" • ")
+                                append("Updated ").append(it)
+                            }
+                        }
+                        if (sub.isNotBlank()) {
+                            Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    if (sub.isNotBlank()) {
-                        Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+                    // Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    //     ElevatedButton(onClick = {
+                    //         // TODO: Launch install flow (reuse phone/tablet logic by extracting helper to shared module/file if desired)
+                    //     }) { Text("Install") }
+                    //     ElevatedButton(onClick = {
+                    //         // TODO: Open details screen for TV
+                    //     }) { Text("Details") }
+                    // }
                 }
-                // Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                //     ElevatedButton(onClick = {
-                //         // TODO: Launch install flow (reuse phone/tablet logic by extracting helper to shared module/file if desired)
-                //     }) { Text("Install") }
-                //     ElevatedButton(onClick = {
-                //         // TODO: Open details screen for TV
-                //     }) { Text("Details") }
-                // }
             }
         }
     }
