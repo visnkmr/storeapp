@@ -107,7 +107,7 @@ onOpenDownloads: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Appstore • TV") })
+            TopAppBar(title = { Text("Vishnu N K's App Store • TV") })
         }
     ) { pad ->
         Column(
@@ -173,7 +173,7 @@ private fun TvAppCard(app: StoreApp,onClick: () -> Unit) {
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier
-            .size(width = 260.dp, height = 180.dp)
+            .size(width = 260.dp, height = 130.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable(true, interactionSource = interaction)
             .clickable(
@@ -188,7 +188,8 @@ private fun TvAppCard(app: StoreApp,onClick: () -> Unit) {
                 containerColor = if (focused) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
             ),
             modifier = Modifier
-                .size(width = 320.dp, height = 180.dp)
+                // .size(width = 320.dp, height = 180.dp)
+                .fillMaxSize()
                 .onKeyEvent { event ->
                     // Handle DPAD using Compose KeyEvent API. Compose versions differ; use native action where available.
                     val native = try { event.nativeKeyEvent } catch (_: Throwable) { null }
