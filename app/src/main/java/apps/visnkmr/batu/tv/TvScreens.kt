@@ -15,13 +15,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.navigationBarsPadding
+
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +52,7 @@ import coil.compose.AsyncImage
 import apps.visnkmr.batu.store.StoreApp
 import apps.visnkmr.batu.store.StoreRepository
 import apps.visnkmr.batu.store.startDownload
+import androidx.compose.foundation.lazy.items
 
 @Composable
 fun TvStoreScreenWrapper(
@@ -54,8 +61,8 @@ fun TvStoreScreenWrapper(
     onOpenDownloads: () -> Unit
 ) {
     // Simple wrapper that reuses StoreHome-like grid but arranged for TV shelves
-    // TvHome(onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo, onOpenDownloads = onOpenDownloads)
-    TvStoreScreen(onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo, onOpenDownloads = onOpenDownloads)
+    TvHome(onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo, onOpenDownloads = onOpenDownloads)
+    // TvStoreScreen(onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo, onOpenDownloads = onOpenDownloads)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,38 +86,84 @@ fun TvHome(
     }
 
     Scaffold(
-        // topBar = { 
-        //     TopAppBar(
-        //         title = { Text("AppStore (TV)") },
-        //         actions = {
-        //             // Add Downloads button for TV UI
-        //             androidx.compose.material3.IconButton(onClick = onOpenDownloads) {
-        //                 Text("📁")
-        //             }
-        //         }
-        //     )
-        // }
+        topBar = { 
+            TopAppBar(
+                title = { Text("Vishnu N K's AppStore") },
+                actions = {
+                    // Add Downloads button for TV UI
+            ElevatedButton(onClick = onOpenDownloads) {
+                Text("Downloads")
+            }
+                    // Add Downloads button for TV UI
+                    // androidx.compose.material3.IconButton(onClick = onOpenDownloads) {
+                    //     Text("📁")
+                    // }
+                }
+            )
+        }
     ) { pad ->
         Column(
             modifier = Modifier
                 .padding(pad)
                 .fillMaxSize()
-                .padding(16.dp)
+                
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp)
         ) {
             errorState.value?.let { Text("Error: $it") }
-            // Single shelf for now: "All apps with images"
-            Text("All", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                appsState.value.forEach { app ->
-                    TvCard(app = app, onClick = { onOpenDetails(app) })
-                }
+
+            // Simple heuristics for sections (can be refined based on tags/lastUpdated)
+            val featured = appsState.value.take(2)
+            val trending = appsState.value.drop(2).take(2)
+            val all = appsState.value
+
+            if(featured.isEmpty() || trending.isEmpty() || all.isEmpty()) return@Column
+
+            if(featured.isNotEmpty()){
+
+                SectionRow(title = "Featured", data = featured, onOpenDetails = onOpenDetails)
+                Spacer(Modifier.height(24.dp))
             }
+            if(trending.isNotEmpty()){
+                SectionRow(title = "Trending", data = trending, onOpenDetails = onOpenDetails)
+                Spacer(Modifier.height(24.dp))
+            }
+            if(all.isNotEmpty()){
+                SectionRow(title = "All apps", data = all, onOpenDetails = onOpenDetails)
+                Spacer(Modifier.height(24.dp))
+            }
+
+            
+        }
+    }
+}
+
+@Composable
+private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (StoreApp) -> Unit,) {
+    // Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
+    // Spacer(Modifier.height(8.dp))
+    Text(title, style = MaterialTheme.typography.titleMedium,modifier=Modifier.padding(top=12.dp))
+    Spacer(Modifier.height(8.dp))
+    // Row(
+    //     modifier = Modifier
+    //         .fillMaxWidth()
+    //         .horizontalScroll(rememberScrollState()),
+    //     horizontalArrangement = Arrangement.spacedBy(12.dp)
+    // ) {
+    //     appsState.value.forEach { app ->
+    //         TvCard(app = app, onClick = { onOpenDetails(app) })
+    //     }
+    // }
+    val listState = rememberLazyListState()
+    LazyRow(
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom=12.dp)
+    ) {
+        items(data) { app ->
+            TvCard(app = app,onClick = { onOpenDetails(app) })
         }
     }
 }
