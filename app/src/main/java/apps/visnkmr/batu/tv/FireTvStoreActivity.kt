@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import apps.visnkmr.batu.store.StoreApp
+import apps.visnkmr.batu.store.StoreRepository
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -69,7 +70,7 @@ import org.json.JSONArray
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.draw.scale
-
+// import apps.visnkmr.batu.tv.TvCard
 /**
  * A large-screen Fire TV–style store activity built with Jetpack Compose and DPAD focus.
  * Layout:
@@ -93,12 +94,15 @@ fun TvStoreScreen( onOpenDetails: (StoreApp) -> Unit,
 onOpenApkInfo: (slug: String, apkPath: String) -> Unit = { _, _ -> },
 onOpenDownloads: () -> Unit) {
     val appsState = remember { mutableStateOf<List<StoreApp>>(emptyList()) }
-    var error by remember { mutableStateOf<String?>(null) }
+    val errorState = remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        runCatching { fetchAppListTv() }
+        runCatching {
+            StoreRepository.loadIfNeeded()
+            StoreRepository.listFiltered()
+        }
             .onSuccess { appsState.value = it }
-            .onFailure { error = it.message }
+            .onFailure { errorState.value = it.message }
     }
 
     Scaffold(
@@ -114,9 +118,8 @@ onOpenDownloads: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
-            if (error != null) {
-                Text("Network error: $error", color = Color(0xFFB00020))
-            }
+            
+            errorState.value?.let { Text("Error: $it") }
 
             // Simple heuristics for sections (can be refined based on tags/lastUpdated)
             val featured = appsState.value.take(2)
@@ -133,9 +136,7 @@ onOpenDownloads: () -> Unit) {
             }
             if (all.isNotEmpty()) {
                 SectionRow(title = "All Apps", data = all, onOpenDetails = { onOpenDetails(it) })
-            } else if (error == null) {
-                Text("Loading…", style = MaterialTheme.typography.bodyMedium)
-            }
+            } 
         }
     }
 }
@@ -212,28 +213,31 @@ private fun TvAppCard(app: StoreApp,onClick: () -> Unit) {
                     .fillMaxSize()
                     .padding(12.dp)
             ) {
-                AsyncImage(
-                    model = app.iconUrl(),
-                    contentDescription = app.title,
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(RoundedCornerShape(16.dp)),
-                    contentScale = ContentScale.Crop
-                )
+                Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.Center) {
+                    AsyncImage(
+                        model = app.iconUrl(),
+                        contentDescription = app.title,
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Crop,
+                        
+                    )
+                }
                 Spacer(Modifier.size(12.dp))
-                Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.Center) {
                     Column {
                         Text(app.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        val sub = buildString {
-                            app.version?.let { append("v").append(it) }
-                            app.lastUpdated?.let {
-                                if (isNotEmpty()) append(" • ")
-                                append("Updated ").append(it)
-                            }
-                        }
-                        if (sub.isNotBlank()) {
-                            Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
+                        // val sub = buildString {
+                        //     app.version?.let { append("v").append(it) }
+                        //     app.lastUpdated?.let {
+                        //         if (isNotEmpty()) append(" • ")
+                        //         append("Updated ").append(it)
+                        //     }
+                        // }
+                        // if (sub.isNotBlank()) {
+                        //     Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // }
                     }
                     // Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     //     ElevatedButton(onClick = {
