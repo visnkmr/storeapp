@@ -105,11 +105,12 @@ fun TvHome(
         Column(
             modifier = Modifier
                 .padding(pad)
+                .padding(12.dp)
                 .fillMaxSize()
                 
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp)
+                // .padding(24.dp)
         ) {
             errorState.value?.let { Text("Error: $it") }
 
@@ -143,7 +144,7 @@ fun TvHome(
 private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (StoreApp) -> Unit,) {
     // Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
     // Spacer(Modifier.height(8.dp))
-    Text(title, style = MaterialTheme.typography.titleMedium,modifier=Modifier.padding(top=12.dp))
+    Text(title, style = MaterialTheme.typography.titleMedium)
     Spacer(Modifier.height(8.dp))
     // Row(
     //     modifier = Modifier
@@ -160,10 +161,10 @@ private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (Store
         state = listState,
         contentPadding = PaddingValues(horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth().padding(bottom=12.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
         items(data) { app ->
-            TvCard(app = app,onClick = { onOpenDetails(app) })
+            TvAppCard(app = app,onClick = { onOpenDetails(app) })
         }
     }
 }

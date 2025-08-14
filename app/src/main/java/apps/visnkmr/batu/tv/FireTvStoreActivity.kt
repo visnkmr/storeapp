@@ -161,7 +161,7 @@ private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (Store
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun TvAppCard(app: StoreApp,onClick: () -> Unit) {
+public fun TvAppCard(app: StoreApp,onClick: () -> Unit) {
     // focus handling
     val focusManager = LocalFocusManager.current
     val requester = remember { FocusRequester() }
