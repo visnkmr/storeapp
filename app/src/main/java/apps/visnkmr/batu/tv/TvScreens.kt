@@ -262,15 +262,28 @@ fun TvHome(
         ) {
             errorState.value?.let { Text("Error: $it") }
 
+            val data=appsState.value
+
             // Simple heuristics for sections (can be refined based on tags/lastUpdated)
-            val featured = appsState.value.take(2)
-            val trending = appsState.value.drop(2).take(2)
-            val all = appsState.value
+            val exclusive = data.filter { app ->
+                app.tags?.any { tag ->
+                    tag.equals("exclusive", ignoreCase = true)
+                } == true
+            }
+            val trending = data.filter { app ->
+                app.tags?.any { tag ->
+                    tag.equals("trending", ignoreCase = true)
+                } == true
+            }
+            // val ex = if (filteredData.isNotEmpty()) filteredData else data
+            val all = appsState.value.filter { app ->
+                            !exclusive.contains(app) && !trending.contains(app)
+                        } + exclusive + trending
 
-            if(featured.isEmpty() || trending.isEmpty() || all.isEmpty()) return@Column
+            if( all.isEmpty()) return@Column
 
-            if(featured.isNotEmpty()){
-                SectionRow(title = "Featured", data = featured, onOpenDetails = onOpenDetails)
+            if(exclusive.isNotEmpty()){
+                SectionRow(title = "Exclusive", data = exclusive, onOpenDetails = onOpenDetails)
                 Spacer(Modifier.height(24.dp))
             }
             if(trending.isNotEmpty()){
@@ -438,7 +451,12 @@ fun FireTvDetailsScreen(
             .onFailure { errorState.value = it.message }
     }
     Scaffold(
-        // topBar = { TopAppBar(title = { Text(repoApp?.title ?: "App") }) }
+        // topBar = { TopAppBar(title = { Text(repoApp?.title ?: "App") },navigationIcon = {
+        //         ElevatedButton(onClick = onBack) {
+        //             Text("←")
+        //         }
+        //     }) },
+                
     ) { pad ->
         if (errorState.value != null) {
             Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {

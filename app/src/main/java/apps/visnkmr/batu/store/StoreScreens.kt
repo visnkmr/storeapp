@@ -219,7 +219,7 @@ fun DownloadsScreen(
                 title = { Text("Downloads") },
                 actions = {
                     // Clear all button in the top-right
-                    IconButton(onClick = { clearAll() }) {
+                    ElevatedButton(onClick = { clearAll() }) {
                         Text("Clear all")
                     }
                 }
