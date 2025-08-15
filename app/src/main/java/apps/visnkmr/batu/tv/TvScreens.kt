@@ -287,6 +287,39 @@ fun TvHome(
 
 @Composable
 private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (StoreApp) -> Unit,) {
+val filteredData = data.filter { app ->
+        app.tags?.any { tag ->
+            tag.equals("aas", ignoreCase = true) || 
+            tag.equals("gp", ignoreCase = true) || 
+            tag.equals("aos", ignoreCase = true)
+        } == true
+    }
+    val displayData = if (filteredData.isNotEmpty()) filteredData else data
+// val validApps = remember { mutableStateOf<List<StoreApp>>(emptyList()) }
+    
+//     LaunchedEffect(displayData) {
+//         val valid = displayData.filter { app ->
+//             try {
+//                 val url = app.iconUrl()
+//                 if (url.isNullOrBlank()) return@filter false
+                
+//                 val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+//                 connection.requestMethod = "HEAD"
+//                 connection.connectTimeout = 5000
+//                 connection.readTimeout = 5000
+//                 val responseCode = connection.responseCode
+//                 connection.disconnect()
+                
+//                 responseCode == 200
+//             } catch (e: Exception) {
+//                 false
+//             }
+//         }
+//         validApps.value = valid
+//     }
+    
+//     val finalData = validApps.value.ifEmpty { displayData }
+    
     nohlfocusablelayo(onClick={},content = {Text(title, style = MaterialTheme.typography.titleMedium)})
     Spacer(Modifier.height(8.dp))
     
@@ -297,7 +330,7 @@ private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (Store
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        items(data) { app ->
+        items(displayData) { app ->
             TvAppCard(app = app, onClick = { onOpenDetails(app) })
         }
     }

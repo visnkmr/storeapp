@@ -146,6 +146,8 @@ onOpenDownloads: () -> Unit) {
 
 @Composable
 private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (StoreApp) -> Unit,) {
+
+    
     Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
     Spacer(Modifier.height(8.dp))
 
