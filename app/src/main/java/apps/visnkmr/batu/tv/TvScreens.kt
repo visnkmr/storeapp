@@ -82,7 +82,7 @@ public fun focusablelayo(onClick: () -> Unit, content: @Composable () -> Unit) {
         tonalElevation = if (focused) 6.dp else 2.dp,
         shadowElevation = if (focused) 8.dp else 2.dp,
         shape = RoundedCornerShape(12.dp),
-        color =  if (focused) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+        color =  if (!focused) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
         modifier = Modifier
             // .size(width = 260.dp, height = 130.dp)
             .onFocusChanged { focused = it.isFocused }
@@ -486,20 +486,28 @@ fun FireTvDetailsScreen(
                     app.screenshots.forEach { path ->
                         val url = if (path.startsWith("http")) path
                         else "https://cdn.jsdelivr.net/gh/visnkmr/appstore@main/${path.trimStart('/')}"
-nohlfocusablelayo(onClick={}, hlval = 1.1f, content={AsyncImage(
-                            model = url,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .height(240.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .padding(end = 10.dp),
-                            contentScale = ContentScale.Fit
-                        )})
+                        nohlfocusablelayo(onClick = {}, hlval = 1.1f, content = {AsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                modifier = Modifier
+                                .size(width =360.dp,height=240.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .padding(end = 10.dp),
+                                contentScale = ContentScale.Inside
+                            )
+                        })
                     }
+                // }
                 }
                 Spacer(Modifier.height(16.dp))
             }
+            Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) { 
             Text(app.description, style = MaterialTheme.typography.bodyLarge)
+                        }
         }
     }
 }
