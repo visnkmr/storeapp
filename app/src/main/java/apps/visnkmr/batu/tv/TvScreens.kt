@@ -1,80 +1,105 @@
 package apps.visnkmr.batu.tv
 
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.navigationBarsPadding
-
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.KeyEventType
-import coil.compose.AsyncImage
-import apps.visnkmr.batu.store.*
-import androidx.compose.foundation.lazy.items
-import coil.compose.AsyncImage
 import apps.visnkmr.batu.store.StoreApp
 import apps.visnkmr.batu.store.StoreRepository
+import apps.visnkmr.batu.store.resolveApkFile
 import apps.visnkmr.batu.store.startDownload
-import androidx.compose.foundation.lazy.items
-import androidx.compose.ui.graphics.Color
+import coil.compose.AsyncImage
+
+private enum class AppStatus {
+    NotInstalled,
+    Installed,
+    UpdateAvailable
+}
+
+@Composable
+private fun rememberAppStatus(app: StoreApp): AppStatus {
+    val context = LocalContext.current
+    val pm = context.packageManager
+    val pkg = app.applicationId
+    val remoteCode = app.versionCode
+    if (pkg.isNullOrBlank()) return AppStatus.NotInstalled
+
+    return try {
+        val pkgInfo = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            pm.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo(pkg, 0)
+        }
+        @Suppress("DEPRECATION")
+        val installedCode = if (android.os.Build.VERSION.SDK_INT >= 28) {
+            pkgInfo.longVersionCode
+        } else {
+            pkgInfo.versionCode.toLong()
+        }
+        if (remoteCode != null && installedCode < remoteCode) {
+            AppStatus.UpdateAvailable
+        } else {
+            AppStatus.Installed
+        }
+    } catch (e: PackageManager.NameNotFoundException) {
+        AppStatus.NotInstalled
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
 public fun focusablelayo(onClick: () -> Unit, content: @Composable () -> Unit) {
-     val focusManager = LocalFocusManager.current
-    val requester = remember { FocusRequester() }
     var focused by remember { mutableStateOf(false) }
     val interaction = remember { MutableInteractionSource() }
     
@@ -84,7 +109,6 @@ public fun focusablelayo(onClick: () -> Unit, content: @Composable () -> Unit) {
         shape = RoundedCornerShape(12.dp),
         color =  if (!focused) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
         modifier = Modifier
-            // .size(width = 260.dp, height = 130.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable(true, interactionSource = interaction)
             .combinedClickable(
@@ -95,64 +119,18 @@ public fun focusablelayo(onClick: () -> Unit, content: @Composable () -> Unit) {
             )
             .scale(if (focused) 1.05f else 1.0f)
     ) {
-        // Card(
-        //     colors = CardDefaults.cardColors(
-        //         containerColor = if (focused) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
-        //     ),
-        //     modifier = Modifier
-        //         .fillMaxSize()
-        //         .onKeyEvent { event ->
-        //             // Handle DPAD using Compose KeyEvent API
-        //             if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-        //             when (event.key) {
-        //                 Key.DirectionCenter, Key.Enter -> {
-        //                     onclick()
-        //                     true
-        //                 }
-        //                 Key.DirectionDown -> { 
-        //                     focusManager.moveFocus(FocusDirection.Down)
-        //                     true 
-        //                 }
-        //                 Key.DirectionUp -> { 
-        //                     focusManager.moveFocus(FocusDirection.Up)
-        //                     true 
-        //                 }
-        //                 Key.DirectionLeft -> { 
-        //                     focusManager.moveFocus(FocusDirection.Left)
-        //                     true 
-        //                 }
-        //                 Key.DirectionRight -> { 
-        //                     focusManager.moveFocus(FocusDirection.Right)
-        //                     true 
-        //                 }
-        //                 else -> false
-        //             }
-        //         }
-                
-        //         .focusRequester(requester)
-        //         .onFocusChanged { focused = it.isFocused }
-        //         .focusable(),
-        //         contentAlignment = Alignment.Center
-        // ) {
         content()
-        // }
-}
+    }
 }
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
 public fun nohlfocusablelayo(onClick: () -> Unit, content: @Composable () -> Unit, hlval: Float = 1.05f) {
-     val focusManager = LocalFocusManager.current
-    val requester = remember { FocusRequester() }
     var focused by remember { mutableStateOf(false) }
     val interaction = remember { MutableInteractionSource() }
     
     androidx.compose.material3.Surface(
-        // tonalElevation = if (focused) 6.dp else 2.dp,
-        // shadowElevation = if (focused) 8.dp else 2.dp,
-        // shape = RoundedCornerShape(12.dp),        
         color =  Color.Transparent,
         modifier = Modifier
-            // .size(width = 260.dp, height = 130.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable(true, interactionSource = interaction)
             .combinedClickable(
@@ -163,48 +141,8 @@ public fun nohlfocusablelayo(onClick: () -> Unit, content: @Composable () -> Uni
             )
             .scale(if (focused) hlval else 1.0f)
     ) {
-        // Card(
-        //     colors = CardDefaults.cardColors(
-        //         containerColor = if (focused) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
-        //     ),
-        //     modifier = Modifier
-        //         .fillMaxSize()
-        //         .onKeyEvent { event ->
-        //             // Handle DPAD using Compose KeyEvent API
-        //             if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-        //             when (event.key) {
-        //                 Key.DirectionCenter, Key.Enter -> {
-        //                     onclick()
-        //                     true
-        //                 }
-        //                 Key.DirectionDown -> { 
-        //                     focusManager.moveFocus(FocusDirection.Down)
-        //                     true 
-        //                 }
-        //                 Key.DirectionUp -> { 
-        //                     focusManager.moveFocus(FocusDirection.Up)
-        //                     true 
-        //                 }
-        //                 Key.DirectionLeft -> { 
-        //                     focusManager.moveFocus(FocusDirection.Left)
-        //                     true 
-        //                 }
-        //                 Key.DirectionRight -> { 
-        //                     focusManager.moveFocus(FocusDirection.Right)
-        //                     true 
-        //                 }
-        //                 else -> false
-        //             }
-        //         }
-                
-        //         .focusRequester(requester)
-        //         .onFocusChanged { focused = it.isFocused }
-        //         .focusable(),
-        //         contentAlignment = Alignment.Center
-        // ) {
         content()
-        // }
-}
+    }
 }
 
 
@@ -216,7 +154,6 @@ fun TvStoreScreenWrapper(
 ) {
     // Simple wrapper that reuses StoreHome-like grid but arranged for TV shelves
     TvHome(onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo, onOpenDownloads = onOpenDownloads)
-    // TvStoreScreen(onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo, onOpenDownloads = onOpenDownloads)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -264,24 +201,24 @@ fun TvHome(
 
             var data=appsState.value
             data = data.filter { app ->
-                app.tags?.any { tag ->
+                app.tags.any { tag ->
                     tag.equals("aas", ignoreCase = true) ||
                             tag.equals("gp", ignoreCase = true) ||
                             tag.equals("aos", ignoreCase = true)
-                } == true
+                }
             }
             
 
             // Simple heuristics for sections (can be refined based on tags/lastUpdated)
             val exclusive = data.filter { app ->
-                app.tags?.any { tag ->
+                app.tags.any { tag ->
                     tag.equals("exclusive", ignoreCase = true)
-                } == true
+                }
             }
             val trending = data.filter { app ->
-                app.tags?.any { tag ->
+                app.tags.any { tag ->
                     tag.equals("trending", ignoreCase = true)
-                } == true
+                }
             }
             // val ex = if (filteredData.isNotEmpty()) filteredData else data
             val all = appsState.value.filter { app ->
@@ -291,15 +228,15 @@ fun TvHome(
             if( all.isEmpty()) return@Column
 
             if(exclusive.isNotEmpty()){
-                SectionRow(title = "Exclusive", data = exclusive, onOpenDetails = onOpenDetails)
+                SectionRow(title = "Exclusive", data = exclusive, onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo)
                 Spacer(Modifier.height(24.dp))
             }
             if(trending.isNotEmpty()){
-                SectionRow(title = "Trending", data = trending, onOpenDetails = onOpenDetails)
+                SectionRow(title = "Trending", data = trending, onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo)
                 Spacer(Modifier.height(24.dp))
             }
             if(all.isNotEmpty()){
-                SectionRow(title = "All apps", data = all, onOpenDetails = onOpenDetails)
+                SectionRow(title = "All apps", data = all, onOpenDetails = onOpenDetails, onOpenApkInfo = onOpenApkInfo)
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -307,40 +244,7 @@ fun TvHome(
 }
 
 @Composable
-private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (StoreApp) -> Unit,) {
-// val filteredData = data.filter { app ->
-//         app.tags?.any { tag ->
-//             tag.equals("aas", ignoreCase = true) || 
-//             tag.equals("gp", ignoreCase = true) || 
-//             tag.equals("aos", ignoreCase = true)
-        // } == true
-//     }
-//     val displayData = if (filteredData.isNotEmpty()) filteredData else data
-    // val validApps = remember { mutableStateOf<List<StoreApp>>(emptyList()) }
-        
-    //     LaunchedEffect(displayData) {
-    //         val valid = displayData.filter { app ->
-    //             try {
-    //                 val url = app.iconUrl()
-    //                 if (url.isNullOrBlank()) return@filter false
-                    
-    //                 val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-    //                 connection.requestMethod = "HEAD"
-    //                 connection.connectTimeout = 5000
-    //                 connection.readTimeout = 5000
-    //                 val responseCode = connection.responseCode
-    //                 connection.disconnect()
-                    
-    //                 responseCode == 200
-    //             } catch (e: Exception) {
-    //                 false
-    //             }
-    //         }
-    //         validApps.value = valid
-    //     }
-        
-    //     val finalData = validApps.value.ifEmpty { displayData }
-    
+private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (StoreApp) -> Unit, onOpenApkInfo: (slug: String, apkPath: String) -> Unit) {
     nohlfocusablelayo(onClick={},content = {Text(title, style = MaterialTheme.typography.titleMedium)})
     Spacer(Modifier.height(8.dp))
     
@@ -352,27 +256,32 @@ private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (Store
         modifier = Modifier.fillMaxWidth()
     ) {
         items(data) { app ->
-            TvAppCard(app = app, onClick = { onOpenDetails(app) })
+            TvAppCard(app = app, onClick = { onOpenDetails(app) }, onOpenApkInfo = onOpenApkInfo)
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 @Composable
-private fun TvCard(
+private fun TvAppCard(
     app: StoreApp,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onOpenApkInfo: (slug: String, apkPath: String) -> Unit
 ) {
+    val context = LocalContext.current
+    val progressMap = remember { mutableStateMapOf<String, Float>() }
+    val statusMap = remember { mutableStateMapOf<String, String>() }
+    val appStatus = rememberAppStatus(app)
+    val scope = rememberCoroutineScope()
+
     // Highlight on focus; open details on click/OK
     val interaction = remember { MutableInteractionSource() }
-    val focusManager = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
-    
-    androidx.compose.material3.Surface(
-        tonalElevation = if (focused) 6.dp else 2.dp,
-        shadowElevation = if (focused) 8.dp else 2.dp,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (focused) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+        ),
         modifier = Modifier
             .size(width = 260.dp, height = 180.dp)
             .onFocusChanged { focused = it.isFocused }
@@ -387,35 +296,8 @@ private fun TvCard(
     ) {
         Column(
             Modifier
+                .fillMaxSize()
                 .padding(10.dp)
-                .onKeyEvent { event ->
-                    // Handle DPAD using Compose KeyEvent API
-                    if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    when (event.key) {
-                        Key.DirectionCenter, Key.Enter -> {
-                            onClick()
-                            true
-                        }
-                        Key.DirectionDown -> { 
-                            focusManager.moveFocus(FocusDirection.Down)
-                            true 
-                        }
-                        Key.DirectionUp -> { 
-                            focusManager.moveFocus(FocusDirection.Up)
-                            true 
-                        }
-                        Key.DirectionLeft -> { 
-                            focusManager.moveFocus(FocusDirection.Left)
-                            true 
-                        }
-                        Key.DirectionRight -> { 
-                            focusManager.moveFocus(FocusDirection.Right)
-                            true 
-                        }
-                        else -> false
-                    }
-                }
-                .focusable()
         ) {
             AsyncImage(
                 model = app.iconUrl(),
@@ -433,6 +315,62 @@ private fun TvCard(
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.titleSmall
             )
+            Spacer(Modifier.height(4.dp))
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                val status = statusMap[app.slug] ?: "idle"
+                when (status) {
+                    "downloading" -> {
+                        val progress = progressMap[app.slug] ?: 0f
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text("${(progress * 100).toInt()}%")
+                        }
+                    }
+                    "downloaded" -> {
+                        ElevatedButton(onClick = {
+                            val file = resolveApkFile(context, app)
+                            onOpenApkInfo(app.slug, file.absolutePath)
+                        }) { Text("Install") }
+                    }
+                    "installing" -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Installing…")
+                        }
+                    }
+                    "installed" -> {
+                        ElevatedButton(onClick = {
+                            app.applicationId?.let {
+                                context.startActivity(context.packageManager.getLaunchIntentForPackage(it))
+                            }
+                        }) { Text("Open") }
+                    }
+                    else -> {
+                        when (appStatus) {
+                            AppStatus.NotInstalled -> ElevatedButton(onClick = {
+                                startDownload(context, app, progressMap, statusMap, scope) { file ->
+                                    onOpenApkInfo(app.slug, file.absolutePath)
+                                }
+                            }) { Text("Install") }
+                            AppStatus.Installed -> ElevatedButton(onClick = {
+                                app.applicationId?.let {
+                                    context.startActivity(context.packageManager.getLaunchIntentForPackage(it))
+                                }
+                            }) { Text("Open") }
+                            AppStatus.UpdateAvailable -> ElevatedButton(onClick = {
+                                startDownload(context, app, progressMap, statusMap, scope) { file ->
+                                    onOpenApkInfo(app.slug, file.absolutePath)
+                                }
+                            }) { Text("Update") }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -441,14 +379,13 @@ private fun TvCard(
 @Composable
 fun FireTvDetailsScreen(
     slug: String,
-    onBack: () -> Unit,
     context: Context,
     onOpenApkInfo: (slug: String, apkPath: String) -> Unit
 ) {
     // Simple reuse of phone layout with slightly larger paddings for TV
-    val appsState = remember { mutableStateOf<List<apps.visnkmr.batu.store.StoreApp>>(emptyList()) }
     val errorState = remember { mutableStateOf<String?>(null) }
     var repoApp by remember { mutableStateOf<apps.visnkmr.batu.store.StoreApp?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         runCatching {
@@ -515,19 +452,11 @@ fun FireTvDetailsScreen(
                 }
                 val p = progress[app.slug] ?: 0f
                 val s = status[app.slug] ?: "idle"
+                val appStatus = rememberAppStatus(app)
                 Box(Modifier.size(160.dp, 56.dp), contentAlignment = Alignment.Center) {
                     when (s) {
-                        "idle" -> focusablelayo(onClick = {
-                            startDownload(context, app, progress, status) { file ->
-                                onOpenApkInfo(app.slug, file.absolutePath)
-                            }
-                        }) {Row(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) { Text("Install") }}
                         "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(progress = p.coerceIn(0f, 1f), modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(progress = { p.coerceIn(0f, 1f) }, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.size(8.dp)); Text("${(p * 100).toInt()}%")
                         }
                         "downloaded" -> Text("Verifying…")
@@ -535,7 +464,42 @@ fun FireTvDetailsScreen(
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.size(8.dp)); Text("Installing…")
                         }
-                        "installed" -> ElevatedButton(onClick = { }) { Text("Open") }
+                        "installed" -> ElevatedButton(onClick = { 
+                            app.applicationId?.let {
+                                context.startActivity(context.packageManager.getLaunchIntentForPackage(it))
+                            }
+                        }) { Text("Open") }
+                        else -> {
+                            when (appStatus) {
+                                AppStatus.NotInstalled -> focusablelayo(onClick = {
+                                    startDownload(context, app, progress, status, scope) { file ->
+                                        onOpenApkInfo(app.slug, file.absolutePath)
+                                    }
+                                }) {Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) { Text("Install") }}
+                                AppStatus.Installed -> focusablelayo(onClick = {
+                                    app.applicationId?.let {
+                                        context.startActivity(context.packageManager.getLaunchIntentForPackage(it))
+                                    }
+                                }) {Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) { Text("Open") }}
+                                AppStatus.UpdateAvailable -> focusablelayo(onClick = {
+                                    startDownload(context, app, progress, status, scope) { file ->
+                                        onOpenApkInfo(app.slug, file.absolutePath)
+                                    }
+                                }) {Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) { Text("Update") }}
+                            }
+                        }
                     }
                 }
             }
@@ -549,7 +513,7 @@ fun FireTvDetailsScreen(
                                 model = url,
                                 contentDescription = null,
                                 modifier = Modifier
-                                .size(width =360.dp,height=240.dp)
+                                .size(width = 360.dp, height = 240.dp)
                                     .clip(RoundedCornerShape(16.dp))
                                     .padding(end = 10.dp),
                                 contentScale = ContentScale.Inside
@@ -578,4 +542,3 @@ fun FireTvDetailsScreen(
         }
     }
 }
-

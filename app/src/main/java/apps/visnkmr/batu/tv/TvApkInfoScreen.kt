@@ -34,7 +34,6 @@ import java.io.File
 fun TvApkInfoScreen(
     slug: String,
     apkPath: String,
-    onBack: () -> Unit,
     context: Context
 ) {
     val file = File(apkPath)

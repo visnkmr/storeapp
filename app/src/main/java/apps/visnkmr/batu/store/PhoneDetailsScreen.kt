@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,41 +38,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
-@Composable
-private fun installLabel(context: Context, app: StoreApp): String {
-    val pkg = app.applicationId
-    val remote = app.versionCode
-    if (pkg.isNullOrBlank() || remote == null) return "Install"
-    return try {
-        val pm = context.packageManager
-        val info = if (android.os.Build.VERSION.SDK_INT >= 33) {
-            pm.getPackageInfo(pkg, android.content.pm.PackageManager.PackageInfoFlags.of(0))
-        } else {
-            @Suppress("DEPRECATION")
-            pm.getPackageInfo(pkg, 0)
-        }
-        val installed = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else @Suppress("DEPRECATION") info.versionCode
-        if (installed < remote) "Update" else "Open"
-    } catch (_: Exception) {
-        "Install"
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhoneDetailsScreen(
     slug: String,
-    onBack: () -> Unit,
     context: Context,
     onOpenApkInfo: (slug: String, apkPath: String) -> Unit = { _, _ -> }
 ) {
     val app = StoreRepository.bySlug(slug)
+    val scope = rememberCoroutineScope()
+    val progressMap = remember { mutableStateMapOf<String, Float>() }
+    val statusMap = remember { mutableStateMapOf<String, String>() }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(app?.title ?: "App") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
+                    IconButton(onClick = { }) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
                 }
             )
         }
@@ -82,9 +66,6 @@ fun PhoneDetailsScreen(
             }
             return@Scaffold
         }
-
-        val progress = remember { mutableStateMapOf<String, Float>() }
-        val status = remember { mutableStateMapOf<String, String>() }
 
         Column(
             modifier = Modifier
@@ -126,17 +107,17 @@ fun PhoneDetailsScreen(
 
             Spacer(Modifier.height(16.dp))
             // Install CTA
-            val p = progress[app.slug] ?: 0f
-            val s = status[app.slug] ?: "idle"
+            val p = progressMap[app.slug] ?: 0f
+            val s = statusMap[app.slug] ?: "idle"
             Box(Modifier.fillMaxWidth().height(50.dp), contentAlignment = Alignment.Center) {
                 when (s) {
                     "idle" -> ElevatedButton(onClick = {
-                        startDownload(context, app, progress, status) { file ->
+                        startDownload(context, app, progressMap, statusMap, scope) { file ->
                             onOpenApkInfo(app.slug, file.absolutePath)
                         }
-                    }) { Text(installLabel(context, app).replace("Install", "Download")) }
+                    }) { Text("Download") }
                     "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(progress = p.coerceIn(0f, 1f), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(progress = { p.coerceIn(0f, 1f) }, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.size(8.dp)); Text("${(p * 100).toInt()}%")
                     }
                     "downloaded" -> Text("Verifying…")

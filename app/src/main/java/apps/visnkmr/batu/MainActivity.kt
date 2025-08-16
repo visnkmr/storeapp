@@ -92,7 +92,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
-import okio.BufferedSource
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -119,90 +118,85 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val isTv = remember { isTvDevice() }
                     val nav = rememberNavController()
-if (!isTv) {
-    // Phone/Tablet graph
-    NavHost(
-        navController = nav,
-        startDestination = "home"
-    ) {
-        composable("home") {
-apps.visnkmr.batu.store.StoreHome(
-    onOpenDetails = { app -> nav.navigate("details/${app.slug}") },
-    onOpenApkInfo = { s, apkPath -> nav.navigate("apk_info/${s}/${android.net.Uri.encode(apkPath)}") },
-    onOpenDownloads = { nav.navigate("downloads") }
-)
-        }
-        composable("details/{slug}") { backStackEntry ->
-            val slug = backStackEntry.arguments?.getString("slug") ?: ""
-            apps.visnkmr.batu.store.PhoneDetailsScreen(
-                slug = slug,
-                onBack = { nav.popBackStack() },
-                context = this@MainActivity,
-                onOpenApkInfo = { s, apkPath -> nav.navigate("apk_info/${s}/${android.net.Uri.encode(apkPath)}") }
-            )
-        }
-        // Phone APK Info screen
-        composable("apk_info/{slug}/{apkPath}") { backStackEntry ->
-            val slug = backStackEntry.arguments?.getString("slug") ?: ""
-            val apkPath = backStackEntry.arguments?.getString("apkPath") ?: ""
-            apps.visnkmr.batu.store.PhoneApkInfoScreen(
-                slug = slug,
-                apkPath = apkPath,
-                onBack = { nav.popBackStack() },
-                context = this@MainActivity
-            )
-        }
-        // Downloads screen
-        composable("downloads") {
-            apps.visnkmr.batu.store.DownloadsScreen(
-                context = this@MainActivity,
-                onBack = { nav.popBackStack() },
-                onOpenApkInfo = { s, apkPath -> nav.navigate("apk_info/${s}/${android.net.Uri.encode(apkPath)}") }
-            )
-        }
-    }
-} else {
-    // TV graph (shelves + details + APK info)
-    NavHost(
-        navController = nav,
-        startDestination = "tv_home"
-    ) {
-        composable("tv_home") {
-            apps.visnkmr.batu.tv.TvStoreScreenWrapper(
-                onOpenDetails = { app -> nav.navigate("tv_details/${app.slug}") },
-                onOpenApkInfo = { s, apkPath -> nav.navigate("tv_apk_info/${s}/${android.net.Uri.encode(apkPath)}") }
-            ) { nav.navigate("tv_downloads") }
-        }
-        composable("tv_details/{slug}") { backStackEntry ->
-            val slug = backStackEntry.arguments?.getString("slug") ?: ""
-            apps.visnkmr.batu.tv.FireTvDetailsScreen(
-                slug = slug,
-                onBack = { nav.popBackStack() },
-                context = this@MainActivity,
-                onOpenApkInfo = { s, apkPath -> nav.navigate("tv_apk_info/${s}/${android.net.Uri.encode(apkPath)}") }
-            )
-        }
-        // TV APK Info screen
-        composable("tv_apk_info/{slug}/{apkPath}") { backStackEntry ->
-            val slug = backStackEntry.arguments?.getString("slug") ?: ""
-            val apkPath = backStackEntry.arguments?.getString("apkPath") ?: ""
-            apps.visnkmr.batu.tv.TvApkInfoScreen(
-                slug = slug,
-                apkPath = apkPath,
-                onBack = { nav.popBackStack() },
-                context = this@MainActivity
-            )
-        }
-        // TV Downloads screen reusing phone DownloadsScreen layout for now
-        composable("tv_downloads") {
-            apps.visnkmr.batu.store.DownloadsScreen(
-                context = this@MainActivity,
-                onBack = { nav.popBackStack() },
-                onOpenApkInfo = { s, apkPath -> nav.navigate("tv_apk_info/${s}/${android.net.Uri.encode(apkPath)}") }
-            )
-        }
-    }
-}
+                    if (!isTv) {
+                        // Phone/Tablet graph
+                        NavHost(
+                            navController = nav,
+                            startDestination = "home"
+                        ) {
+                            composable("home") {
+                                apps.visnkmr.batu.store.StoreHome(
+                                    onOpenDetails = { app -> nav.navigate("details/${app.slug}") },
+                                    onOpenApkInfo = { s, apkPath -> nav.navigate("apk_info/${s}/${android.net.Uri.encode(apkPath)}") },
+                                    onOpenDownloads = { nav.navigate("downloads") }
+                                )
+                            }
+                            composable("details/{slug}") { backStackEntry ->
+                                val slug = backStackEntry.arguments?.getString("slug") ?: ""
+                                apps.visnkmr.batu.store.PhoneDetailsScreen(
+                                    slug = slug,
+                                    context = this@MainActivity,
+                                    onOpenApkInfo = { s, apkPath -> nav.navigate("apk_info/${s}/${android.net.Uri.encode(apkPath)}") }
+                                )
+                            }
+                            // Phone APK Info screen
+                            composable("apk_info/{slug}/{apkPath}") { backStackEntry ->
+                                val slug = backStackEntry.arguments?.getString("slug") ?: ""
+                                val apkPath = backStackEntry.arguments?.getString("apkPath") ?: ""
+                                apps.visnkmr.batu.store.PhoneApkInfoScreen(
+                                    slug = slug,
+                                    apkPath = apkPath,
+                                    context = this@MainActivity
+                                )
+                            }
+                            // Downloads screen
+                            composable("downloads") {
+                                apps.visnkmr.batu.store.DownloadsScreen(
+                                    context = this@MainActivity,
+                                    onOpenApkInfo = { s, apkPath -> nav.navigate("apk_info/${s}/${android.net.Uri.encode(apkPath)}") }
+                                )
+                            }
+                        }
+                    } else {
+                        // TV graph (shelves + details + APK info)
+                        NavHost(
+                            navController = nav,
+                            startDestination = "tv_home"
+                        ) {
+                            composable("tv_home") {
+                                apps.visnkmr.batu.tv.TvStoreScreenWrapper(
+                                    onOpenDetails = { app -> nav.navigate("tv_details/${app.slug}") },
+                                    onOpenApkInfo = { s, apkPath -> nav.navigate("tv_apk_info/${s}/${android.net.Uri.encode(apkPath)}") },
+                                    onOpenDownloads = { nav.navigate("tv_downloads") }
+                                )
+                            }
+                            composable("tv_details/{slug}") { backStackEntry ->
+                                val slug = backStackEntry.arguments?.getString("slug") ?: ""
+                                apps.visnkmr.batu.tv.FireTvDetailsScreen(
+                                    slug = slug,
+                                    context = this@MainActivity,
+                                    onOpenApkInfo = { s, apkPath -> nav.navigate("tv_apk_info/${s}/${android.net.Uri.encode(apkPath)}") }
+                                )
+                            }
+                            // TV APK Info screen
+                            composable("tv_apk_info/{slug}/{apkPath}") { backStackEntry ->
+                                val slug = backStackEntry.arguments?.getString("slug") ?: ""
+                                val apkPath = backStackEntry.arguments?.getString("apkPath") ?: ""
+                                apps.visnkmr.batu.tv.TvApkInfoScreen(
+                                    slug = slug,
+                                    apkPath = apkPath,
+                                    context = this@MainActivity
+                                )
+                            }
+                            // TV Downloads screen reusing phone DownloadsScreen layout for now
+                            composable("tv_downloads") {
+                                apps.visnkmr.batu.store.DownloadsScreen(
+                                    context = this@MainActivity,
+                                    onOpenApkInfo = { s, apkPath -> nav.navigate("tv_apk_info/${s}/${android.net.Uri.encode(apkPath)}") }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

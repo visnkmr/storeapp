@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -164,6 +165,7 @@ fun parseApkInfo(context: Context, apk: File): ApkInfo {
         sourceDir = apk.absolutePath
         publicSourceDir = apk.absolutePath
     }
+    @Suppress("DEPRECATION")
     val vCode = try {
         if (android.os.Build.VERSION.SDK_INT >= 28) pkgInfo?.longVersionCode else pkgInfo?.versionCode?.toLong()
     } catch (_: Exception) { null }
@@ -197,7 +199,6 @@ fun parseApkInfo(context: Context, apk: File): ApkInfo {
 @Composable
 fun DownloadsScreen(
     context: Context,
-    onBack: () -> Unit,
     onOpenApkInfo: (slug: String, apkPath: String) -> Unit
 ) {
     val filesState = remember { mutableStateOf(listDownloadedApks(context)) }
@@ -241,7 +242,6 @@ fun DownloadsScreen(
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(files) { f ->
                         val info = parseApkInfo(context, f)
-                        val slugGuess = info.packageName ?: f.nameWithoutExtension
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             modifier = Modifier.fillMaxWidth()
@@ -339,6 +339,7 @@ fun StoreHome(
     val appsState = remember { mutableStateOf<List<StoreApp>>(emptyList()) }
     val errorState = remember { mutableStateOf<String?>(null) }
     val queryState = remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
 
     // Track download states per slug for button animation
     val progressMap = remember { mutableStateMapOf<String, Float>() }
@@ -392,11 +393,11 @@ fun StoreHome(
             }
             var data=appsState.value
             data = data.filter { app ->
-                app.tags?.any { tag ->
+                app.tags.any { tag ->
                     tag.equals("aas", ignoreCase = true) ||
                             tag.equals("gp", ignoreCase = true) ||
                             tag.equals("aos", ignoreCase = true)
-                } == true
+                }
             }
             val filtered = if (queryState.value.isBlank()) data
             else data.filter {
@@ -416,13 +417,50 @@ fun StoreHome(
                         onInstall = { 
                             // Phone list: after download completes, do NOT auto-open APK info screen.
                             // Status will become "downloaded" and the button will change to "Install".
-                            startDownload(context, app, progressMap, statusMap) { /* no-op on list */ }
+                            startDownload(context, app, progressMap, statusMap, scope) { /* no-op on list */ }
                         },
                         onOpenApkInfo = { slug, apkPath -> onOpenApkInfo(slug, apkPath) }
                     )
                 }
             }
         }
+    }
+}
+
+private enum class AppStatus {
+    NotInstalled,
+    Installed,
+    UpdateAvailable
+}
+
+@Composable
+private fun rememberAppStatus(app: StoreApp): AppStatus {
+    val context = LocalContext.current
+    val pm = context.packageManager
+    val pkg = app.applicationId
+    val remoteCode = app.versionCode
+    if (pkg.isNullOrBlank()) return AppStatus.NotInstalled
+
+    return try {
+        val pkgInfo = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            pm.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo(pkg, 0)
+        }
+        @Suppress("DEPRECATION")
+        val installedCode = if (android.os.Build.VERSION.SDK_INT >= 28) {
+            pkgInfo.longVersionCode
+        } else {
+            pkgInfo.versionCode.toLong()
+        }
+        if (remoteCode != null && installedCode < remoteCode) {
+            AppStatus.UpdateAvailable
+        } else {
+            AppStatus.Installed
+        }
+    } catch (e: PackageManager.NameNotFoundException) {
+        AppStatus.NotInstalled
     }
 }
 
@@ -434,10 +472,10 @@ fun AppRow(
     onClick: () -> Unit,
     onInstall: () -> Unit,
     onOpenApkInfo: (slug: String, apkPath: String) -> Unit = { _, _ -> }
-
-    
 ) {
     val context = LocalContext.current
+    val appStatus = rememberAppStatus(app)
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
@@ -487,12 +525,9 @@ fun AppRow(
                 contentAlignment = Alignment.Center
             ) {
                 when (status) {
-                    "idle" -> {
-                        ElevatedButton(onClick = onInstall) { Text("Download") }
-                    }
                     "downloading" -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(progress = progress.coerceIn(0f, 1f), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp))
                             Text("${(progress * 100).toInt()}%")
                         }
@@ -511,7 +546,22 @@ fun AppRow(
                         }
                     }
                     "installed" -> {
-                        ElevatedButton(onClick = { /* Open not implemented here, handled in details */ }) { Text("Open") }
+                        ElevatedButton(onClick = {
+                            app.applicationId?.let {
+                                context.startActivity(context.packageManager.getLaunchIntentForPackage(it))
+                            }
+                        }) { Text("Open") }
+                    }
+                    else -> {
+                        when (appStatus) {
+                            AppStatus.NotInstalled -> ElevatedButton(onClick = onInstall) { Text("Install") }
+                            AppStatus.Installed -> ElevatedButton(onClick = {
+                                app.applicationId?.let {
+                                    context.startActivity(context.packageManager.getLaunchIntentForPackage(it))
+                                }
+                            }) { Text("Open") }
+                            AppStatus.UpdateAvailable -> ElevatedButton(onClick = onInstall) { Text("Update") }
+                        }
                     }
                 }
             }
@@ -542,6 +592,7 @@ public fun startDownload(
     app: StoreApp,
     progressMap: MutableMap<String, Float>,
     statusMap: MutableMap<String, String>,
+    scope: CoroutineScope,
     onDownloaded: ((File) -> Unit)? = null
 ) {
     if (!ensureInstallPermission(context)) {
@@ -563,8 +614,7 @@ public fun startDownload(
     val id = dm.enqueue(request)
     statusMap[app.slug] = "downloading"
     // Poll progress using a coroutine tied to composition
-    // Launch a background coroutine tied to a global scope since we're not in @Composable here.
-    kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+    scope.launch(Dispatchers.IO) {
         val q = DownloadManager.Query().setFilterById(id)
         var done = false
         while (!done) {
@@ -601,12 +651,12 @@ public fun startDownload(
 @Composable
 fun AppDetails(
     app: StoreApp,
-    onBack: () -> Unit,
     onOpenApkInfo: (slug: String, apkPath: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val progressMap = remember { mutableStateMapOf<String, Float>() }
     val statusMap = remember { mutableStateMapOf<String, String>() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -649,15 +699,10 @@ fun AppDetails(
                 Box(modifier = Modifier.width(140.dp), contentAlignment = Alignment.Center) {
                     val progress = progressMap[app.slug] ?: 0f
                     val status = statusMap[app.slug] ?: "idle"
+                    val appStatus = rememberAppStatus(app)
                     when (status) {
-                        "idle" -> {
-                            val label = rememberInstallLabel(context, app).replace("Install", "Download")
-                            ElevatedButton(onClick = {
-                                startDownload(context, app, progressMap, statusMap) { /* after download, UI will show 'downloaded' state */ }
-                            }) { Text(label) }
-                        }
                         "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(progress = progress.coerceIn(0f, 1f), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp)); Text("${(progress*100).toInt()}%")
                         }
                         "downloaded" -> {
@@ -671,8 +716,25 @@ fun AppDetails(
                             Spacer(Modifier.width(8.dp)); Text("Installing…")
                         }
                         "installed" -> ElevatedButton(onClick = {
-                            // Try to open package if we can infer; otherwise no-op
+                            app.applicationId?.let {
+                                context.startActivity(context.packageManager.getLaunchIntentForPackage(it))
+                            }
                         }) { Text("Open") }
+                        else -> {
+                            when (appStatus) {
+                                AppStatus.NotInstalled -> ElevatedButton(onClick = {
+                                    startDownload(context, app, progressMap, statusMap, scope) { /* after download, UI will show 'downloaded' state */ }
+                                }) { Text("Install") }
+                                AppStatus.Installed -> ElevatedButton(onClick = {
+                                    app.applicationId?.let {
+                                        context.startActivity(context.packageManager.getLaunchIntentForPackage(it))
+                                    }
+                                }) { Text("Open") }
+                                AppStatus.UpdateAvailable -> ElevatedButton(onClick = {
+                                    startDownload(context, app, progressMap, statusMap, scope) { /* after download, UI will show 'downloaded' state */ }
+                                }) { Text("Update") }
+                            }
+                        }
                     }
                 }
             }
@@ -711,31 +773,5 @@ fun AppDetails(
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-    }
-}
-
-// Determine whether to show Install or Update based on installed versionCode vs JSON versionCode
-@Composable
-private fun rememberInstallLabel(context: android.content.Context, app: StoreApp): String {
-    val pm = context.packageManager
-    val pkg = app.applicationId
-    val remoteCode = app.versionCode
-    if (pkg.isNullOrBlank() || remoteCode == null) return "Install"
-    return try {
-        val pkgInfo = if (android.os.Build.VERSION.SDK_INT >= 33) {
-            pm.getPackageInfo(pkg, android.content.pm.PackageManager.PackageInfoFlags.of(0))
-        } else {
-            @Suppress("DEPRECATION")
-            pm.getPackageInfo(pkg, 0)
-        }
-        val installedCode = if (android.os.Build.VERSION.SDK_INT >= 28) {
-            pkgInfo.longVersionCode.toInt()
-        } else {
-            @Suppress("DEPRECATION")
-            pkgInfo.versionCode
-        }
-        if (installedCode < remoteCode) "Update" else "Open"
-    } catch (_: Exception) {
-        "Install"
     }
 }
