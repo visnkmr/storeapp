@@ -25,14 +25,14 @@ android {
                 "proguard-rules.pro"
             )
         }
-        debug {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
+        // debug {
+        //     isMinifyEnabled = true
+        //     isShrinkResources = true
+        //     proguardFiles(
+        //         getDefaultProguardFile("proguard-android-optimize.txt"),
+        //         "proguard-rules.pro"
+        //     )
+        // }
     }
 
     buildFeatures {

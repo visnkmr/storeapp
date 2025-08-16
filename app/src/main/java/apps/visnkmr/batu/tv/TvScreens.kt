@@ -262,7 +262,15 @@ fun TvHome(
         ) {
             errorState.value?.let { Text("Error: $it") }
 
-            val data=appsState.value
+            var data=appsState.value
+            data = data.filter { app ->
+                app.tags?.any { tag ->
+                    tag.equals("aas", ignoreCase = true) ||
+                            tag.equals("gp", ignoreCase = true) ||
+                            tag.equals("aos", ignoreCase = true)
+                } == true
+            }
+            
 
             // Simple heuristics for sections (can be refined based on tags/lastUpdated)
             val exclusive = data.filter { app ->
@@ -300,38 +308,38 @@ fun TvHome(
 
 @Composable
 private fun SectionRow(title: String, data: List<StoreApp>,onOpenDetails: (StoreApp) -> Unit,) {
-val filteredData = data.filter { app ->
-        app.tags?.any { tag ->
-            tag.equals("aas", ignoreCase = true) || 
-            tag.equals("gp", ignoreCase = true) || 
-            tag.equals("aos", ignoreCase = true)
-        } == true
-    }
-    val displayData = if (filteredData.isNotEmpty()) filteredData else data
-// val validApps = remember { mutableStateOf<List<StoreApp>>(emptyList()) }
-    
-//     LaunchedEffect(displayData) {
-//         val valid = displayData.filter { app ->
-//             try {
-//                 val url = app.iconUrl()
-//                 if (url.isNullOrBlank()) return@filter false
-                
-//                 val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-//                 connection.requestMethod = "HEAD"
-//                 connection.connectTimeout = 5000
-//                 connection.readTimeout = 5000
-//                 val responseCode = connection.responseCode
-//                 connection.disconnect()
-                
-//                 responseCode == 200
-//             } catch (e: Exception) {
-//                 false
-//             }
-//         }
-//         validApps.value = valid
+// val filteredData = data.filter { app ->
+//         app.tags?.any { tag ->
+//             tag.equals("aas", ignoreCase = true) || 
+//             tag.equals("gp", ignoreCase = true) || 
+//             tag.equals("aos", ignoreCase = true)
+        // } == true
 //     }
-    
-//     val finalData = validApps.value.ifEmpty { displayData }
+//     val displayData = if (filteredData.isNotEmpty()) filteredData else data
+    // val validApps = remember { mutableStateOf<List<StoreApp>>(emptyList()) }
+        
+    //     LaunchedEffect(displayData) {
+    //         val valid = displayData.filter { app ->
+    //             try {
+    //                 val url = app.iconUrl()
+    //                 if (url.isNullOrBlank()) return@filter false
+                    
+    //                 val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+    //                 connection.requestMethod = "HEAD"
+    //                 connection.connectTimeout = 5000
+    //                 connection.readTimeout = 5000
+    //                 val responseCode = connection.responseCode
+    //                 connection.disconnect()
+                    
+    //                 responseCode == 200
+    //             } catch (e: Exception) {
+    //                 false
+    //             }
+    //         }
+    //         validApps.value = valid
+    //     }
+        
+    //     val finalData = validApps.value.ifEmpty { displayData }
     
     nohlfocusablelayo(onClick={},content = {Text(title, style = MaterialTheme.typography.titleMedium)})
     Spacer(Modifier.height(8.dp))
@@ -343,7 +351,7 @@ val filteredData = data.filter { app ->
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        items(displayData) { app ->
+        items(data) { app ->
             TvAppCard(app = app, onClick = { onOpenDetails(app) })
         }
     }

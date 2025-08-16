@@ -390,8 +390,16 @@ fun StoreHome(
             errorState.value?.let { err ->
                 Text("Error: $err", color = Color(0xFFB00020))
             }
-            val filtered = if (queryState.value.isBlank()) appsState.value
-            else appsState.value.filter {
+            var data=appsState.value
+            data = data.filter { app ->
+                app.tags?.any { tag ->
+                    tag.equals("aas", ignoreCase = true) ||
+                            tag.equals("gp", ignoreCase = true) ||
+                            tag.equals("aos", ignoreCase = true)
+                } == true
+            }
+            val filtered = if (queryState.value.isBlank()) data
+            else data.filter {
                 it.title.contains(queryState.value, ignoreCase = true) ||
                         it.tags.any { t -> t.contains(queryState.value, ignoreCase = true) }
             }
