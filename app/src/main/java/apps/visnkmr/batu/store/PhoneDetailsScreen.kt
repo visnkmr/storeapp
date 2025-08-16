@@ -119,13 +119,7 @@ fun PhoneDetailsScreen(
                     if (meta.isNotBlank()) {
                         Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    val repoText = when {
-                        !app.repoName.isNullOrBlank() -> "Report issues to ${app.repoName}"
-                        else -> null
-                    }
-                    repoText?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+
                 }
                 // Install CTA
                 val p = progress[app.slug] ?: 0f
@@ -175,6 +169,14 @@ fun PhoneDetailsScreen(
 
             // Description
             Text(app.description, style = MaterialTheme.typography.bodyMedium)
+            val repoText = when {
+                !app.repoName.isNullOrBlank() -> "Report issues @ https://github.com/visnkmr/ ${app.repoName}"
+                else -> null
+            }
+            repoText?.let {
+                Spacer(Modifier.height(16.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }

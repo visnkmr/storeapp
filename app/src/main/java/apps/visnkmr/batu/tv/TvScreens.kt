@@ -566,7 +566,15 @@ fun FireTvDetailsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) { 
             Text(app.description, style = MaterialTheme.typography.bodyLarge)
-                        }
+            val repoText = when {
+                !app.repoName.isNullOrBlank() -> "Report issues @ https://github.com/visnkmr/${app.repoName}"
+                else -> null
+            }
+            repoText?.let {
+                Spacer(Modifier.height(16.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+                    }
         }
     }
 }

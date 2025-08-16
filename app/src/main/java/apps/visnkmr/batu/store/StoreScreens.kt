@@ -644,15 +644,7 @@ fun AppDetails(
                     if (line.isNotBlank()) {
                         Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    // Repo info / issues
-                    val repoText = when {
-                        !app.repoUrl.isNullOrBlank() && !app.repoName.isNullOrBlank() -> "Report issues to ${app.repoName}"
-                        !app.repoName.isNullOrBlank() -> "Report issues to ${app.repoName}"
-                        else -> null
-                    }
-                    repoText?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+
                 }
                 Box(modifier = Modifier.width(140.dp), contentAlignment = Alignment.Center) {
                     val progress = progressMap[app.slug] ?: 0f
@@ -708,6 +700,16 @@ fun AppDetails(
                 Spacer(Modifier.height(12.dp))
             }
             Text(app.description, style = MaterialTheme.typography.bodyMedium)
+            // Repo info / issues
+            val repoText = when {
+                !app.repoUrl.isNullOrBlank() && !app.repoName.isNullOrBlank() -> "Report issues to ${app.repoName}"
+                !app.repoName.isNullOrBlank() -> "Report issues @ https://github.com/visnkmr/ ${app.repoName}"
+                else -> null
+            }
+            repoText?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
