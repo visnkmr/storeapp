@@ -121,47 +121,55 @@ fun PhoneDetailsScreen(
                     }
 
                 }
-                // Install CTA
-                val p = progress[app.slug] ?: 0f
-                val s = status[app.slug] ?: "idle"
-                Box(Modifier.size(120.dp, 48.dp), contentAlignment = Alignment.Center) {
-                    when (s) {
-                        "idle" -> ElevatedButton(onClick = {
-    startDownload(context, app, progress, status) { file ->
-        onOpenApkInfo(app.slug, file.absolutePath)
-    }
-}) { Text(installLabel(context, app).replace("Install", "Download")) }
-                        "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(progress = p.coerceIn(0f, 1f), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.size(8.dp)); Text("${(p * 100).toInt()}%")
-                        }
-                        "downloaded" -> Text("Verifying…")
-                        "installing" -> Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.size(8.dp)); Text("Installing…")
-                        }
-                        "installed" -> ElevatedButton(onClick = { }) { Text("Open") }
-                    }
-                }
+
             }
 
+            Spacer(Modifier.height(16.dp))
+            // Install CTA
+            val p = progress[app.slug] ?: 0f
+            val s = status[app.slug] ?: "idle"
+            Box(Modifier.fillMaxWidth().height(50.dp), contentAlignment = Alignment.Center) {
+                when (s) {
+                    "idle" -> ElevatedButton(onClick = {
+                        startDownload(context, app, progress, status) { file ->
+                            onOpenApkInfo(app.slug, file.absolutePath)
+                        }
+                    }) { Text(installLabel(context, app).replace("Install", "Download")) }
+                    "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(progress = p.coerceIn(0f, 1f), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.size(8.dp)); Text("${(p * 100).toInt()}%")
+                    }
+                    "downloaded" -> Text("Verifying…")
+                    "installing" -> Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.size(8.dp)); Text("Installing…")
+                    }
+                    "installed" -> ElevatedButton(onClick = { }) { Text("Open") }
+                }
+            }
             Spacer(Modifier.height(16.dp))
 
             // Screenshots
             if (app.screenshots.isNotEmpty()) {
-                Row(Modifier.horizontalScroll(rememberScrollState())) {
-                    app.screenshots.forEach { path ->
-                        val url = if (path.startsWith("http")) path
-                        else "https://cdn.jsdelivr.net/gh/visnkmr/appstore@main/${path.trimStart('/')}"
-                        AsyncImage(
-                            model = url,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .height(200.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .padding(end = 8.dp),
-                            contentScale = ContentScale.Fit
-                        )
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Row(Modifier.horizontalScroll(rememberScrollState())) {
+                        app.screenshots.forEach { path ->
+                            val url = if (path.startsWith("http")) path
+                            else "https://cdn.jsdelivr.net/gh/visnkmr/appstore@main/${
+                                path.trimStart(
+                                    '/'
+                                )
+                            }"
+                            AsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .padding(end = 8.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
