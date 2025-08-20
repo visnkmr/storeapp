@@ -9,9 +9,9 @@ android {
 
     defaultConfig {
         applicationId = "visnkmr.apps.appstore"
-        minSdk = 24
+        minSdk = 21
         targetSdk = 34
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0"
     }
 
@@ -48,6 +48,10 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+    }
+    
+    lint {
+        disable += "DuplicatePlatformClasses"
     }
 }
 

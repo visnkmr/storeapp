@@ -146,7 +146,8 @@ class MainActivity : ComponentActivity() {
                                 apps.visnkmr.batu.store.PhoneApkInfoScreen(
                                     slug = slug,
                                     apkPath = apkPath,
-                                    context = this@MainActivity
+                                    context = this@MainActivity,
+                                    onBack = { nav.popBackStack() }
                                 )
                             }
                             // Downloads screen
