@@ -68,7 +68,8 @@ object StoreRepository {
                     applicationId = o.optString("applicationID", null),
                     versionCode = if (o.has("versionCode")) o.optInt("versionCode") else null,
                     repoName = o.optString("reponame", null),
-                    repoUrl = o.optString("repourl", null)
+                    repoUrl = o.optString("repourl", null),
+                    browseUrl = o.optString("browseurl", null)
                 )
             )
         }

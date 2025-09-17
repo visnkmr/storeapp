@@ -79,7 +79,8 @@ data class StoreApp(
     val applicationId: String? = null,
     val versionCode: Int? = null,
     val repoName: String? = null,
-    val repoUrl: String? = null
+    val repoUrl: String? = null,
+    val browseUrl: String? = null
 ) {
     fun iconUrl(): String? {
         // Example images path rule: images/<key>.webp on the repo
@@ -107,7 +108,8 @@ private fun parseApps(json: String): List<StoreApp> {
                 tags = o.optJSONArray("tags")?.let { jArr -> List(jArr.length()) { idx -> jArr.optString(idx) } } ?: emptyList(),
                 screenshots = o.optJSONArray("screenshot")?.let { jArr -> List(jArr.length()) { idx -> jArr.optString(idx) } } ?: emptyList(),
                 youtube = o.optJSONArray("youtube")?.let { jArr -> List(jArr.length()) { idx -> jArr.optString(idx) } } ?: emptyList(),
-                excerpt = o.optString("excerpt", null)
+                excerpt = o.optString("excerpt", null),
+                browseUrl = o.optString("browseurl", null)
             )
         )
     }
@@ -480,7 +482,12 @@ fun AppRow(
             ) {
                 when (status) {
                     "idle" -> {
-                        ElevatedButton(onClick = onInstall) { Text("Download") }
+                        if (app.browseUrl != null) {
+                            ElevatedButton(onClick = { openBrowser(context, app.browseUrl!!) }) { Text("Browse") }
+                        } else if (app.downloadUrl.isNotEmpty()) {
+                            ElevatedButton(onClick = onInstall) { Text("Download") }
+                        }
+                        // If neither, show nothing
                     }
                     "downloading" -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -651,10 +658,15 @@ fun AppDetails(
                     val status = statusMap[app.slug] ?: "idle"
                     when (status) {
                         "idle" -> {
-                            val label = rememberInstallLabel(context, app).replace("Install", "Download")
-                            ElevatedButton(onClick = {
-                                startDownload(context, app, progressMap, statusMap) { /* after download, UI will show 'downloaded' state */ }
-                            }) { Text(label) }
+                            if (app.browseUrl != null) {
+                                ElevatedButton(onClick = { openBrowser(context, app.browseUrl!!) }) { Text("Browse") }
+                            } else if (app.downloadUrl.isNotEmpty()) {
+                                val label = rememberInstallLabel(context, app).replace("Install", "Download")
+                                ElevatedButton(onClick = {
+                                    startDownload(context, app, progressMap, statusMap) { /* after download, UI will show 'downloaded' state */ }
+                                }) { Text(label) }
+                            }
+                            // If neither, show nothing
                         }
                         "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(progress = progress.coerceIn(0f, 1f), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -727,5 +739,15 @@ private fun rememberInstallLabel(context: android.content.Context, app: StoreApp
         if (installedCode < remoteCode) "Update" else "Open"
     } catch (_: Exception) {
         "Install"
+    }
+}
+
+// Helper to open browser with given URL
+fun openBrowser(context: Context, url: String) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        // Handle case where no browser is available
     }
 }
