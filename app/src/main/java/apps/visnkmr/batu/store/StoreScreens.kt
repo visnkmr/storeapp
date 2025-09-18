@@ -476,16 +476,19 @@ fun AppRow(
             // Google Play like button animation: idle -> circular progress with percentage -> Open
             Box(
                 modifier = Modifier
-                    .width(120.dp)
+                    // .width(120.dp)
                     .height(40.dp),
                 contentAlignment = Alignment.Center
             ) {
                 when (status) {
                     "idle" -> {
-                        if (app.browseUrl != null) {
-                            ElevatedButton(onClick = { openBrowser(context, app.browseUrl!!) }) { Text("Browse") }
-                        } else if (app.downloadUrl.isNotEmpty()) {
-                            ElevatedButton(onClick = onInstall) { Text("Download") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (app.browseUrl != null) {
+                                ElevatedButton(onClick = { openBrowser(context, app.browseUrl!!) }) { Text("Browse") }
+                            }
+                            if (app.downloadUrl.trim().isNotEmpty() && app.downloadUrl.trim() != "null") {
+                                ElevatedButton(onClick = onInstall) { Text("Download") }
+                            }
                         }
                         // If neither, show nothing
                     }
@@ -653,18 +656,21 @@ fun AppDetails(
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Box(modifier = Modifier.width(140.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.width(200.dp), contentAlignment = Alignment.Center) {
                     val progress = progressMap[app.slug] ?: 0f
                     val status = statusMap[app.slug] ?: "idle"
                     when (status) {
                         "idle" -> {
-                            if (app.browseUrl != null) {
-                                ElevatedButton(onClick = { openBrowser(context, app.browseUrl!!) }) { Text("Browse") }
-                            } else if (app.downloadUrl.isNotEmpty()) {
-                                val label = rememberInstallLabel(context, app).replace("Install", "Download")
-                                ElevatedButton(onClick = {
-                                    startDownload(context, app, progressMap, statusMap) { /* after download, UI will show 'downloaded' state */ }
-                                }) { Text(label) }
+                            if (app.downloadUrl.trim().isNotEmpty() && app.downloadUrl.trim() != "null") {
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    if (app.browseUrl != null) {
+                                        ElevatedButton(onClick = { openBrowser(context, app.browseUrl!!) }) { Text("Browse") }
+                                    }
+                                    val label = rememberInstallLabel(context, app).replace("Install", "Download")
+                                    ElevatedButton(onClick = {
+                                        startDownload(context, app, progressMap, statusMap) { /* after download, UI will show 'downloaded' state */ }
+                                    }) { Text(label) }
+                                }
                             }
                             // If neither, show nothing
                         }
