@@ -137,6 +137,9 @@ fun PhoneApkInfoScreen(
             InfoSection(title = "Services", entries = info.services)
             InfoSection(title = "Receivers", entries = info.receivers)
             InfoSection(title = "Permissions", entries = info.permissions)
+
+            // Signature Information Section
+            SignatureInfoSection(signatureInfo = info.signatureInfo)
         }
     }
 }
@@ -155,6 +158,134 @@ private fun InfoSection(title: String, entries: List<String>) {
                 Text(s, style = MaterialTheme.typography.bodySmall)
                 if (idx != entries.lastIndex) {
                     Divider(Modifier.padding(top = 6.dp))
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(16.dp))
+}
+
+@Composable
+private fun SignatureInfoSection(signatureInfo: ApkSignatureUtils.SignatureInfo?) {
+    if (signatureInfo == null) return
+
+    Text("Signature Information", style = MaterialTheme.typography.titleSmall)
+    Spacer(Modifier.height(6.dp))
+
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Signature Status
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Status:", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                Text(
+                    if (signatureInfo.isSigned) "Signed" else "Not Signed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (signatureInfo.isSigned)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.error
+                )
+            }
+
+            if (signatureInfo.isSigned) {
+                Divider(Modifier.padding(vertical = 4.dp))
+
+                // Signature Hash
+                signatureInfo.signatureHash?.let {
+                    Text("Signature Hash (SHA-256):", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+
+                // Certificate Information
+                signatureInfo.certificateInfo?.let { certInfo ->
+                    Text("Certificate Details:", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        certInfo,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+
+                // Issuer
+                signatureInfo.issuer?.let {
+                    Divider(Modifier.padding(vertical = 4.dp))
+                    Text("Issuer:", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+
+                // Subject
+                signatureInfo.subject?.let {
+                    Text("Subject:", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+
+                // Validity Period
+                if (signatureInfo.validFrom != null || signatureInfo.validUntil != null) {
+                    Divider(Modifier.padding(vertical = 4.dp))
+                    Text("Validity:", style = MaterialTheme.typography.bodySmall)
+                    Row(modifier = Modifier.padding(start = 8.dp)) {
+                        signatureInfo.validFrom?.let {
+                            Text(
+                                "From: $it",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        signatureInfo.validUntil?.let {
+                            if (signatureInfo.validFrom != null) {
+                                Text(" | ", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Text(
+                                "Until: $it",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Serial Number
+                signatureInfo.serialNumber?.let {
+                    Divider(Modifier.padding(vertical = 4.dp))
+                    Text("Serial Number:", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+
+                // Algorithm
+                signatureInfo.algorithm?.let {
+                    Divider(Modifier.padding(vertical = 4.dp))
+                    Text("Algorithm:", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
                 }
             }
         }

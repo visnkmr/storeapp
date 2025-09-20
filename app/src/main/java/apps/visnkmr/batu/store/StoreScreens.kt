@@ -151,7 +151,8 @@ data class ApkInfo(
     val activities: List<String>,
     val services: List<String>,
     val receivers: List<String>,
-    val icon: android.graphics.drawable.Drawable? = null // optionally include resolved icon/banner
+    val icon: android.graphics.drawable.Drawable? = null, // optionally include resolved icon/banner
+    val signatureInfo: ApkSignatureUtils.SignatureInfo? = null // APK signature information
 )
 
 fun parseApkInfo(context: Context, apk: File): ApkInfo {
@@ -159,7 +160,7 @@ fun parseApkInfo(context: Context, apk: File): ApkInfo {
     @Suppress("DEPRECATION")
     val pkgInfo = pm.getPackageArchiveInfo(
         apk.absolutePath,
-        PackageManager.GET_PERMISSIONS or PackageManager.GET_ACTIVITIES or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS
+        PackageManager.GET_PERMISSIONS or PackageManager.GET_ACTIVITIES or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS or PackageManager.GET_SIGNATURES
     )
     // Prepare to resolve app resources (icon/banner) directly from the APK, without FileProvider URI
     pkgInfo?.applicationInfo?.apply {
@@ -182,6 +183,10 @@ fun parseApkInfo(context: Context, apk: File): ApkInfo {
         null
     }
 
+    // Extract signature information
+    val signatureUtils = ApkSignatureUtils(context)
+    val signatureInfo = signatureUtils.getSignatureInfo(apk.absolutePath)
+
     return ApkInfo(
         packageName = pkgInfo?.packageName,
         versionName = pkgInfo?.versionName,
@@ -190,7 +195,8 @@ fun parseApkInfo(context: Context, apk: File): ApkInfo {
         activities = pkgInfo?.activities?.map { it.name } ?: emptyList(),
         services = pkgInfo?.services?.map { it.name } ?: emptyList(),
         receivers = pkgInfo?.receivers?.map { it.name } ?: emptyList(),
-        icon = iconDrawable
+        icon = iconDrawable,
+        signatureInfo = signatureInfo
     )
 }
  
